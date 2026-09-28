@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { ArrowRight, Check, ChevronDown, Clock3, MapPin, Minus, PackageCheck, Plus, Search, ShoppingBag, SlidersHorizontal, Sparkles, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 import { categories, formatRupiah, products, type Product } from "@/data/catalog";
 import { useCart } from "@/contexts/CartContext";
+import { calculateOrderTotal, makeOrderId } from "@/lib/order";
 
 function Header({ onCart }: { onCart: () => void }) {
   const { count } = useCart();
@@ -77,16 +78,21 @@ function CartDrawer({ open, onClose, onCheckout }: { open: boolean; onClose: () 
 }
 
 function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
-  const { subtotal, clearCart } = useCart();
+  const [, navigate] = useLocation();
+  const { items, subtotal, clearCart } = useCart();
   const [form, setForm] = useState({ name: "", whatsapp: "", village: "Sawahan", address: "", note: "" });
   if (!open) return null;
-  const total = subtotal + 5000;
+  const total = calculateOrderTotal(subtotal);
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.name || !form.whatsapp || !form.address) return toast.error("Lengkapi nama, WhatsApp, dan alamat terlebih dahulu.");
+    const orderId = makeOrderId();
+    const order = { id: orderId, customer: form.name, whatsapp: form.whatsapp, village: form.village, address: form.address, note: form.note, items, subtotal, delivery: 5000, total, payment: "COD", createdAt: new Date().toISOString() };
+    window.sessionStorage.setItem(`pasarku_order_${orderId}`, JSON.stringify(order));
     clearCart();
     onDone();
-    toast.success("Pesanan berhasil dibuat", { description: "Admin PASARKU akan menghubungi Anda untuk konfirmasi." });
+    toast.success("Pesanan berhasil dibuat.", { description: "Admin PASARKU akan menghubungi Anda via WhatsApp untuk konfirmasi." });
+    window.setTimeout(() => navigate(`/pesanan/${orderId}`), 300);
   };
   const setField = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   return <div className="checkout-backdrop"><div className="checkout-modal"><div className="drawer-heading"><div><span className="eyebrow">Langkah terakhir</span><h2>Checkout COD</h2></div><button className="close-button" onClick={onClose}><X size={20} /></button></div><form onSubmit={submit} className="checkout-form"><div className="form-grid"><label>Nama penerima<input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Contoh: Sari Wulandari" /></label><label>No. WhatsApp<input value={form.whatsapp} onChange={(e) => setField("whatsapp", e.target.value)} placeholder="08xxxxxxxxxx" /></label></div><label>Desa / wilayah<select value={form.village} onChange={(e) => setField("village", e.target.value)}><option>Sawahan</option><option>Bareng</option><option>Duren</option><option>Margopatut</option></select></label><label>Alamat lengkap<input value={form.address} onChange={(e) => setField("address", e.target.value)} placeholder="Dusun, RT/RW, patokan rumah" /></label><label>Catatan untuk kurir <span className="optional">opsional</span><textarea value={form.note} onChange={(e) => setField("note", e.target.value)} placeholder="Contoh: titip di warung depan rumah" rows={3} /></label><div className="payment-choice"><div className="payment-icon">▣</div><div><strong>Bayar di tempat (COD)</strong><span>Kurir membawa nota digital dan menagih saat barang sampai.</span></div><Check size={18} /></div><div className="checkout-total"><span>Total yang dibayar</span><strong>{formatRupiah(total)}</strong></div><button className="primary-button full-width" type="submit">Buat pesanan <ArrowRight size={17} /></button><p className="fine-print">Ini adalah pratinjau. Pembayaran dan notifikasi WhatsApp belum diaktifkan.</p></form></div></div>;

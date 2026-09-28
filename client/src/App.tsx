@@ -8,10 +8,11 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { CartProvider } from "./contexts/CartContext";
 import Home from "./pages/Home";
 import ProductDetail from "./pages/ProductDetail";
+import OrderSummary from "./pages/OrderSummary";
 import Admin from "./pages/Admin";
 
 function Router() {
-  return <Switch><Route path="/" component={Home} /><Route path="/produk/:id" component={ProductDetail} /><Route path="/admin" component={Admin} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
+  return <Switch><Route path="/" component={Home} /><Route path="/produk/:id" component={ProductDetail} /><Route path="/pesanan/:id" component={OrderSummary} /><Route path="/admin" component={Admin} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
 }
 
 function App() {
