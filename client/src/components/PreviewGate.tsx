@@ -1,15 +1,22 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, ShieldCheck } from "lucide-react";
+import { useLocation } from "wouter";
 import { AUTH_EVENT, USER_SESSION_KEY } from "@/lib/auth";
 
 const PREVIEW_PASSWORD = "pasarku2016";
 const ACCESS_KEY = "pasarku_preview_unlocked_v2";
 
 export default function PreviewGate({ children }: { children: ReactNode }) {
+  const [location, navigate] = useLocation();
   const [unlocked, setUnlocked] = useState(() => window.localStorage.getItem(ACCESS_KEY) === "true");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!unlocked || location !== "/") return;
+    if (!window.localStorage.getItem(USER_SESSION_KEY)) navigate("/masuk");
+  }, [location, navigate, unlocked]);
 
   if (unlocked) return <>{children}</>;
 
