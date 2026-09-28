@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, Check, ChevronDown, Clock3, MapPin, Minus, PackageCheck, Plus, Search, ShoppingBag, SlidersHorizontal, Sparkles, Truck, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Clock3, MapPin, Minus, PackageCheck, Plus, Search, Settings, ShoppingBag, SlidersHorizontal, Sparkles, Truck, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { categories, formatRupiah, products, type Product } from "@/data/catalog";
 import { useCart } from "@/contexts/CartContext";
@@ -8,9 +8,14 @@ import { calculateOrderTotal, makeOrderId } from "@/lib/order";
 import { buildAdminWhatsAppLink } from "@/lib/whatsapp";
 import { AUTH_EVENT, USER_SESSION_KEY } from "@/lib/auth";
 
+function LogOutIcon() {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg>;
+}
+
 function Header({ onCart }: { onCart: () => void }) {
   const { count } = useCart();
   const [userName, setUserName] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   useEffect(() => {
     const loadUser = () => { try {
       const session = JSON.parse(window.localStorage.getItem(USER_SESSION_KEY) || "null") as { name?: string } | null;
@@ -25,6 +30,7 @@ function Header({ onCart }: { onCart: () => void }) {
   const logout = () => {
     window.localStorage.removeItem(USER_SESSION_KEY);
     setUserName(null);
+    setProfileOpen(false);
     window.dispatchEvent(new Event(AUTH_EVENT));
     toast.success("Anda sudah keluar", { description: "Sesi pengguna di browser ini telah dihapus." });
   };
@@ -45,7 +51,7 @@ function Header({ onCart }: { onCart: () => void }) {
             <ShoppingBag size={18} />
             {count > 0 && <span className="cart-count">{count}</span>}
           </button>
-          {userName ? <button className="login-button user-logout-button" onClick={logout} title={`Keluar dari akun ${userName}`}>Keluar</button> : <Link href="/masuk" className="login-button">Masuk</Link>}
+          {userName ? <div className="profile-menu"><button className="profile-trigger" onClick={() => setProfileOpen((current) => !current)} aria-expanded={profileOpen}><span className="profile-avatar">{userName.charAt(0).toUpperCase()}</span><span className="profile-name">{userName}</span><ChevronDown size={14} /></button>{profileOpen && <div className="profile-dropdown"><div className="profile-dropdown-heading"><span className="profile-avatar large">{userName.charAt(0).toUpperCase()}</span><div><strong>{userName}</strong><small>Pengguna PASARKU</small></div></div><button className="profile-item" onClick={() => toast("Profil pengguna akan dilengkapi pada tahap berikutnya.")}><UserRound size={15} /> Profil pengguna</button><button className="profile-item" onClick={() => toast("Pengaturan akun akan tersedia setelah login nyata diaktifkan.")}><Settings size={15} /> Pengaturan</button><div className="profile-divider"></div><button className="profile-item danger" onClick={logout}><LogOutIcon /> Keluar</button></div>}</div> : <Link href="/masuk" className="login-button">Masuk</Link>}
         </div>
       </div>
     </header>
