@@ -1,5 +1,6 @@
 export const SIMULATED_OTP = "123456";
 export const USER_SESSION_KEY = "pasarku_user_session";
+export const AUTH_EVENT = "pasarku-auth-changed";
 
 export function normalizeWhatsApp(value: string) {
   const digits = value.replace(/\D/g, "");

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Eye, LockKeyhole, MessageCircle, Phone, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
-import { normalizeWhatsApp, SIMULATED_OTP, USER_SESSION_KEY } from "@/lib/auth";
+import { AUTH_EVENT, normalizeWhatsApp, SIMULATED_OTP, USER_SESSION_KEY } from "@/lib/auth";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -30,6 +30,7 @@ export default function Login() {
     if (otp !== SIMULATED_OTP) return toast.error("Kode OTP belum benar. Gunakan kode simulasi yang ditampilkan.");
     const displayName = mode === "register" ? name.trim() : `Warga ${sentTo.slice(-4)}`;
     window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify({ name: displayName, phone: sentTo, mode, signedInAt: new Date().toISOString() }));
+    window.dispatchEvent(new Event(AUTH_EVENT));
     toast.success(mode === "register" ? "Akun berhasil dibuat" : "Berhasil masuk", { description: `Selamat datang di PASARKU, ${displayName}.` });
     navigate("/");
   };

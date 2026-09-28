@@ -6,22 +6,26 @@ import { categories, formatRupiah, products, type Product } from "@/data/catalog
 import { useCart } from "@/contexts/CartContext";
 import { calculateOrderTotal, makeOrderId } from "@/lib/order";
 import { buildAdminWhatsAppLink } from "@/lib/whatsapp";
-import { USER_SESSION_KEY } from "@/lib/auth";
+import { AUTH_EVENT, USER_SESSION_KEY } from "@/lib/auth";
 
 function Header({ onCart }: { onCart: () => void }) {
   const { count } = useCart();
   const [userName, setUserName] = useState<string | null>(null);
   useEffect(() => {
-    try {
+    const loadUser = () => { try {
       const session = JSON.parse(window.localStorage.getItem(USER_SESSION_KEY) || "null") as { name?: string } | null;
       setUserName(session?.name || null);
     } catch {
       setUserName(null);
-    }
+    } };
+    loadUser();
+    window.addEventListener(AUTH_EVENT, loadUser);
+    return () => window.removeEventListener(AUTH_EVENT, loadUser);
   }, []);
   const logout = () => {
     window.localStorage.removeItem(USER_SESSION_KEY);
     setUserName(null);
+    window.dispatchEvent(new Event(AUTH_EVENT));
     toast.success("Anda sudah keluar", { description: "Sesi pengguna di browser ini telah dihapus." });
   };
   return (
