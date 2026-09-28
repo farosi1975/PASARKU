@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, ShieldCheck } from "lucide-react";
+import { AUTH_EVENT, USER_SESSION_KEY } from "@/lib/auth";
 
-const PREVIEW_PASSWORD = "pasarku2026";
-const ACCESS_KEY = "pasarku_preview_unlocked";
+const PREVIEW_PASSWORD = "pasarku2016";
+const ACCESS_KEY = "pasarku_preview_unlocked_v2";
 
 export default function PreviewGate({ children }: { children: ReactNode }) {
   const [unlocked, setUnlocked] = useState(() => window.localStorage.getItem(ACCESS_KEY) === "true");
@@ -16,6 +17,8 @@ export default function PreviewGate({ children }: { children: ReactNode }) {
     event.preventDefault();
     if (password === PREVIEW_PASSWORD) {
       window.localStorage.setItem(ACCESS_KEY, "true");
+      window.localStorage.removeItem(USER_SESSION_KEY);
+      window.dispatchEvent(new Event(AUTH_EVENT));
       setUnlocked(true);
       setError("");
       return;
