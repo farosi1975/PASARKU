@@ -10,9 +10,10 @@ import Home from "./pages/Home";
 import ProductDetail from "./pages/ProductDetail";
 import OrderSummary from "./pages/OrderSummary";
 import Admin from "./pages/Admin";
+import Courier from "./pages/Courier";
 
 function Router() {
-  return <Switch><Route path="/" component={Home} /><Route path="/produk/:id" component={ProductDetail} /><Route path="/pesanan/:id" component={OrderSummary} /><Route path="/admin" component={Admin} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
+  return <Switch><Route path="/" component={Home} /><Route path="/produk/:id" component={ProductDetail} /><Route path="/pesanan/:id" component={OrderSummary} /><Route path="/admin" component={Admin} /><Route path="/kurir" component={Courier} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
 }
 
 function App() {
