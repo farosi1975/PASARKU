@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, Check, ChevronDown, Clock3, MapPin, Minus, PackageCheck, Plus, Search, ShoppingBag, SlidersHorizontal, Sparkles, Truck, X } from "lucide-react";
 import { toast } from "sonner";
@@ -6,9 +6,24 @@ import { categories, formatRupiah, products, type Product } from "@/data/catalog
 import { useCart } from "@/contexts/CartContext";
 import { calculateOrderTotal, makeOrderId } from "@/lib/order";
 import { buildAdminWhatsAppLink } from "@/lib/whatsapp";
+import { USER_SESSION_KEY } from "@/lib/auth";
 
 function Header({ onCart }: { onCart: () => void }) {
   const { count } = useCart();
+  const [userName, setUserName] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const session = JSON.parse(window.localStorage.getItem(USER_SESSION_KEY) || "null") as { name?: string } | null;
+      setUserName(session?.name || null);
+    } catch {
+      setUserName(null);
+    }
+  }, []);
+  const logout = () => {
+    window.localStorage.removeItem(USER_SESSION_KEY);
+    setUserName(null);
+    toast.success("Anda sudah keluar", { description: "Sesi pengguna di browser ini telah dihapus." });
+  };
   return (
     <header className="site-header">
       <div className="container-wide header-inner">
@@ -26,7 +41,7 @@ function Header({ onCart }: { onCart: () => void }) {
             <ShoppingBag size={18} />
             {count > 0 && <span className="cart-count">{count}</span>}
           </button>
-          <Link href="/masuk" className="login-button">Masuk</Link>
+          {userName ? <button className="login-button user-logout-button" onClick={logout} title={`Keluar dari akun ${userName}`}>Keluar</button> : <Link href="/masuk" className="login-button">Masuk</Link>}
         </div>
       </div>
     </header>
