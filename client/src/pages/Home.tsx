@@ -44,6 +44,7 @@ function Header({ onCart }: { onCart: () => void }) {
         <nav className="desktop-nav" aria-label="Navigasi utama">
           <a href="#jelajahi">Jelajahi</a>
           <a href="#cara-kerja">Cara kerja</a>
+          <Link href="/penjual">Jual di PASARKU</Link>
           <Link href="/admin">Panel admin <span className="nav-dot">Preview</span></Link>
         </nav>
         <div className="header-actions">

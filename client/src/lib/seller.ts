@@ -1,0 +1,12 @@
+export const SELLER_SESSION_KEY = "pasarku_seller_session";
+export const SELLER_PRODUCTS_KEY = "pasarku_seller_products";
+export const SELLER_OTP = "123456";
+
+export type SellerProfile = { shopName: string; ownerName: string; phone: string; village: string; verifiedAt: string };
+export type SellerProduct = { id: string; name: string; category: string; price: number; stock: number; createdAt: string };
+
+export function normalizeSellerPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
+  return digits.startsWith("62") ? digits : digits;
+}
