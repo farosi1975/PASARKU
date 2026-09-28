@@ -26,7 +26,7 @@ function Header({ onCart }: { onCart: () => void }) {
             <ShoppingBag size={18} />
             {count > 0 && <span className="cart-count">{count}</span>}
           </button>
-          <button className="login-button" onClick={() => toast("Login warga akan ditambahkan pada tahap berikutnya.")}>Masuk</button>
+          <Link href="/masuk" className="login-button">Masuk</Link>
         </div>
       </div>
     </header>
