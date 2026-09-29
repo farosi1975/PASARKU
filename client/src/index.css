@@ -752,3 +752,43 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .seller-danger-button { display: inline-flex; align-items: center; gap: 7px; margin-top: 23px; padding: 10px 13px; border: 1px solid #efcfc7; border-radius: 8px; color: #b85a4a; background: #fff5f2; font-size: 9px; font-weight: 800; }
 .seller-danger-button:hover { background: #ffeae5; }
 @media (max-width: 780px) { .seller-auth-main { display: block; padding-top: 25px; } .seller-auth-aside { display: none; } .seller-auth-card { padding: 27px 22px; } .seller-dashboard { display: block; padding-top: 22px; } .seller-sidebar { min-height: auto; margin-bottom: 22px; } .seller-sidebar-bottom { margin-top: 10px; } .seller-product-grid { grid-template-columns: 1fr; } .seller-content-heading { display: block; } .seller-content-heading .seller-verified-badge { margin-top: 15px; } }
+
+/* Courier verification and settings */
+.courier-login-header { width: min(900px, calc(100% - 40px)); min-height: 75px; display: flex; align-items: center; justify-content: space-between; margin: 0 auto; position: relative; z-index: 1; }
+.courier-login-header .brand { color: #fff; }
+.courier-login-header .back-link { color: #ddd7e7; }
+.courier-login-header .back-link:hover { color: #fff; }
+.courier-login-expanded { margin-top: 0; }
+.courier-form select { width: 100%; min-height: 42px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; outline: 0; color: var(--ink); background: #fff; font-size: 10px; }
+.courier-otp-note { display: flex; gap: 9px; padding: 11px; border: 1px dashed #e4b3a3; border-radius: 9px; color: #9a6553; background: #fff5f0; font-size: 9px; line-height: 1.6; }
+.courier-otp-note svg { flex: 0 0 auto; color: var(--green); }
+.courier-otp-note strong, .courier-otp-note small { display: block; }
+.courier-otp-note small { margin-top: 4px; color: #a58d81; }
+.courier-otp-note b { color: var(--orange-dark); letter-spacing: .15em; }
+.courier-back-button { border: 0; color: #9c948a; background: transparent; font-size: 9px; font-weight: 700; }
+.courier-dashboard-layout { display: grid; grid-template-columns: 215px minmax(0, 1fr); gap: 34px; }
+.courier-sidebar { min-height: 550px; display: flex; flex-direction: column; padding: 15px 10px; border: 1px solid rgba(255,255,255,.12); border-radius: 15px; background: rgba(255,255,255,.07); }
+.courier-side-profile { padding: 8px 9px 17px; margin-bottom: 9px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.courier-side-profile strong, .courier-side-profile small { display: block; }
+.courier-side-profile strong { margin-top: 9px; color: #fff; font-size: 11px; }
+.courier-side-profile small { display: flex; align-items: center; gap: 4px; margin-top: 5px; color: #a9d7b1; font-size: 8px; }
+.courier-avatar.large { width: 40px; height: 40px; }
+.courier-side-item { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 38px; padding: 0 10px; border: 0; border-radius: 8px; color: #c7bfd2; background: transparent; font-size: 9px; font-weight: 800; text-align: left; }
+.courier-side-item:hover, .courier-side-item.active { color: #fff; background: rgba(238,112,76,.22); }
+.courier-side-bottom { margin-top: auto; }
+.courier-mvp-note { display: block; padding: 12px 9px; color: #a59cb4; font-size: 8px; line-height: 1.4; }
+.courier-side-item.danger { color: #f3aaa0; }
+.courier-content { min-width: 0; }
+.courier-settings { max-width: 670px; padding-top: 13px; color: #fff; }
+.courier-settings h1 { margin: 7px 0; font-family: "Space Grotesk", sans-serif; font-size: 31px; letter-spacing: -.06em; }
+.courier-settings > p { color: #bcb3ca; font-size: 10px; }
+.courier-setting-card { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 18px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: rgba(255,255,255,.07); }
+.courier-setting-icon { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; color: #f2a17d; background: rgba(238,112,76,.18); }
+.courier-setting-card > div:nth-child(2) { min-width: 0; flex: 1; }
+.courier-setting-card strong, .courier-setting-card small { display: block; }
+.courier-setting-card strong { color: #fff; font-size: 10px; }
+.courier-setting-card small { margin-top: 4px; color: #bcb3ca; font-size: 8px; }
+.courier-verified-badge { display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; border-radius: 7px; color: #a9d7b1; background: rgba(111,190,123,.18); font-size: 8px; font-weight: 800; white-space: nowrap; }
+.courier-danger-button { display: inline-flex; align-items: center; gap: 7px; margin-top: 22px; padding: 10px 13px; border: 1px solid rgba(243,170,160,.35); border-radius: 8px; color: #f3aaa0; background: rgba(243,170,160,.08); font-size: 9px; font-weight: 800; }
+.courier-danger-button:hover { background: rgba(243,170,160,.16); }
+@media (max-width: 780px) { .courier-login-header { min-height: 68px; } .courier-login-header .back-link { font-size: 0; } .courier-login-header .back-link svg { width: 18px; height: 18px; } .courier-dashboard-layout { display: block; } .courier-sidebar { min-height: auto; margin-bottom: 22px; } .courier-side-bottom { margin-top: 10px; } .courier-setting-card { align-items: start; } .courier-verified-badge { margin-left: auto; } }
