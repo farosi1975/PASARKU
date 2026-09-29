@@ -62,3 +62,8 @@ export async function listCourierOrders(courierId: number) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(orders).where(eq(orders.courierId, courierId)).orderBy(desc(orders.createdAt));
 }
+
+export async function listCouriers() {
+  const db = await getDb(); if (!db) return [];
+  return db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle }).from(courierProfiles).orderBy(courierProfiles.name);
+}

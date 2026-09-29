@@ -36,4 +36,9 @@ describe("marketplace synchronization API", () => {
     const result = await caller.marketplace.order({ orderCode: "INV-NOT-FOUND" });
     expect(result).toBeUndefined();
   });
+
+  it("rejects courier assignment with an invalid phone number", async () => {
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.marketplace.assignCourier({ orderCode: "INV-TEST", whatsapp: "123" })).rejects.toThrow();
+  });
 });

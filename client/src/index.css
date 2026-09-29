@@ -796,3 +796,9 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 /* Cart item removal */
 .quantity-control .remove-link { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; padding: 0 6px; margin-left: 7px; border: 1px solid #f0d2ca; border-radius: 6px; color: #b65f50; background: #fff7f4; font-size: 8px; font-weight: 800; }
 .quantity-control .remove-link:hover { color: #fff; background: #c96755; border-color: #c96755; }
+
+/* Courier assignment */
+.courier-select { min-width: 148px; max-width: 180px; border: 1px solid #e7ded6; border-radius: 10px; background: #fffaf6; color: #3d332d; padding: 8px 28px 8px 10px; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.courier-select:focus { outline: 3px solid rgba(239, 101, 61, 0.18); border-color: #ef653d; }
+.courier-select:disabled { opacity: .6; cursor: not-allowed; }
+@media (max-width: 900px) { .courier-select { min-width: 128px; max-width: 150px; } }

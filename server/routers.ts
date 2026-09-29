@@ -3,7 +3,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getDb, getOrderWithItems, listApprovedProducts, listCourierOrders, listOrders, listSellerProducts } from "./db";
+import { getDb, getOrderWithItems, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerProducts } from "./db";
 import { courierProfiles, orderItems, orders, products, sellerProfiles } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -38,6 +38,7 @@ export const appRouter = router({
       const db = await dbRequired(); const orderCode = `INV-${Date.now()}`; const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp: input.whatsapp, village: input.village, address: input.address, note: input.note, subtotal: input.subtotal, delivery: input.delivery, total: input.total, payment: input.payment, status: "Menunggu" }); const orderId = Number((result as any)[0]?.insertId ?? 0); await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity }))); return getOrderWithItems(orderCode);
     }),
     orders: publicProcedure.query(() => listOrders()),
+    couriers: publicProcedure.query(() => listCouriers()),
     order: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).query(({ input }) => getOrderWithItems(input.orderCode)),
     assignCourier: publicProcedure.input(z.object({ orderCode: z.string(), whatsapp: phone })).mutation(async ({ input }) => { const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, input.whatsapp)).limit(1); if (!courier[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Kurir belum terverifikasi." }); await db.update(orders).set({ courierId: courier[0].id, status: "Diproses" }).where(eq(orders.orderCode, input.orderCode)); return { success: true, courier: courier[0] }; }),
     courierOrders: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => { const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, input.whatsapp)).limit(1); return courier[0] ? listCourierOrders(courier[0].id) : []; }),
