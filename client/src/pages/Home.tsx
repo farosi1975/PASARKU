@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, Check, ChevronDown, Clock3, MapPin, Minus, PackageCheck, Plus, Search, Settings, ShoppingBag, SlidersHorizontal, Sparkles, Truck, UserRound, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Clock3, MapPin, Minus, PackageCheck, Plus, Search, Settings, ShoppingBag, SlidersHorizontal, Sparkles, Truck, Trash2, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { categories, formatRupiah, products, type Product } from "@/data/catalog";
 import { useCart } from "@/contexts/CartContext";
@@ -94,7 +94,7 @@ function CartDrawer({ open, onClose, onCheckout }: { open: boolean; onClose: () 
         ) : (
           <>
             <div className="cart-items">
-              {items.map((item) => <div className="cart-item" key={item.id}><div className={`cart-thumb ${item.accent}`}>{item.emoji}</div><div className="cart-item-main"><strong>{item.name}</strong><span>{formatRupiah(item.price)}{item.unit}</span><div className="quantity-control"><button onClick={() => updateQuantity(item.id, item.quantity - 1)}><Minus size={13} /></button><span>{item.quantity}</span><button onClick={() => updateQuantity(item.id, item.quantity + 1)}><Plus size={13} /></button><button className="remove-link" onClick={() => removeItem(item.id)}>Hapus</button></div></div></div>)}
+              {items.map((item) => <div className="cart-item" key={item.id}><div className={`cart-thumb ${item.accent}`}>{item.emoji}</div><div className="cart-item-main"><strong>{item.name}</strong><span>{formatRupiah(item.price)}{item.unit}</span><div className="quantity-control"><button onClick={() => updateQuantity(item.id, item.quantity - 1)}><Minus size={13} /></button><span>{item.quantity}</span><button onClick={() => updateQuantity(item.id, item.quantity + 1)}><Plus size={13} /></button><button className="remove-link" onClick={() => { removeItem(item.id); toast.success(`${item.name} dihapus dari keranjang`); }}><Trash2 size={13} /> Hapus item</button></div></div></div>)}
             </div>
             <div className="cart-summary"><div><span>Subtotal</span><strong>{formatRupiah(subtotal)}</strong></div><div><span>Antar lokal</span><strong>{formatRupiah(delivery)}</strong></div><div className="summary-total"><span>Total perkiraan</span><strong>{formatRupiah(subtotal + delivery)}</strong></div><p className="summary-note"><Clock3 size={14} /> Diantar 30–45 menit · Bayar COD</p><button className="primary-button full-width" onClick={onCheckout}>Lanjut ke checkout <ArrowRight size={17} /></button></div>
           </>
