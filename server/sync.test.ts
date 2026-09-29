@@ -41,4 +41,9 @@ describe("marketplace synchronization API", () => {
     const caller = appRouter.createCaller(createContext());
     await expect(caller.marketplace.assignCourier({ orderCode: "INV-TEST", whatsapp: "123" })).rejects.toThrow();
   });
+
+  it("rejects delivery confirmation without a valid order code", async () => {
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.marketplace.confirmDelivery({ orderCode: "" })).rejects.toThrow();
+  });
 });
