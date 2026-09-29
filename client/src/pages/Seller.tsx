@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronRight, ClipboardList, LogOut, Pack
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { SELLER_OTP, SELLER_PRODUCTS_KEY, SELLER_SESSION_KEY, type SellerProduct, type SellerProfile, normalizeSellerPhone } from "@/lib/seller";
+import { trpc } from "@/lib/trpc";
 
 type Panel = "products" | "settings";
 
@@ -14,13 +15,17 @@ export default function Seller() {
   const [profileForm, setProfileForm] = useState({ shopName: "", ownerName: "", phone: "", village: "Sawahan" });
   const [otp, setOtp] = useState("");
   const [productForm, setProductForm] = useState({ name: "", category: "Kuliner", price: "", stock: "" });
+  const registerSeller = trpc.marketplace.registerSeller.useMutation();
+  const createProduct = trpc.marketplace.createProduct.useMutation();
+  const syncedProducts = trpc.marketplace.sellerProducts.useQuery({ whatsapp: profile?.phone || "" }, { enabled: Boolean(profile?.phone) });
 
   useEffect(() => { window.localStorage.setItem(SELLER_PRODUCTS_KEY, JSON.stringify(products)); }, [products]);
+  useEffect(() => { if (syncedProducts.data?.length) setProducts(syncedProducts.data.map((item) => ({ id: String(item.id), name: item.name, category: item.category, price: item.price, stock: item.stock, createdAt: new Date(item.createdAt).toISOString() }))); }, [syncedProducts.data]);
   const phone = useMemo(() => normalizeSellerPhone(profileForm.phone), [profileForm.phone]);
 
   const requestOtp = (event: React.FormEvent) => { event.preventDefault(); if (!profileForm.shopName || !profileForm.ownerName || phone.length < 10) return toast.error("Lengkapi nama toko, nama pemilik, dan nomor WhatsApp."); setVerifyStep("otp"); toast.success("OTP simulasi siap", { description: `Kode verifikasi untuk +${phone}.` }); };
-  const verify = (event: React.FormEvent) => { event.preventDefault(); if (otp !== SELLER_OTP) return toast.error("Kode OTP belum benar. Gunakan 123456 untuk simulasi."); const next = { ...profileForm, phone, verifiedAt: new Date().toISOString() }; window.localStorage.setItem(SELLER_SESSION_KEY, JSON.stringify(next)); setProfile(next); toast.success("Profil penjual terverifikasi"); };
-  const addProduct = (event: React.FormEvent) => { event.preventDefault(); const price = Number(productForm.price); const stock = Number(productForm.stock); if (!productForm.name || !price || stock < 0) return toast.error("Isi nama produk, harga, dan stok dengan benar."); setProducts((current) => [{ id: `seller-${Date.now()}`, name: productForm.name, category: productForm.category, price, stock, createdAt: new Date().toISOString() }, ...current]); setProductForm({ name: "", category: "Kuliner", price: "", stock: "" }); toast.success("Produk berhasil ditambahkan ke katalog penjual."); };
+  const verify = (event: React.FormEvent) => { event.preventDefault(); if (otp !== SELLER_OTP) return toast.error("Kode OTP belum benar. Gunakan 123456 untuk simulasi."); const next = { ...profileForm, phone, verifiedAt: new Date().toISOString() }; window.localStorage.setItem(SELLER_SESSION_KEY, JSON.stringify(next)); setProfile(next); registerSeller.mutate({ shopName: next.shopName, ownerName: next.ownerName, whatsapp: next.phone, village: next.village }, { onError: (error) => toast.error("Profil tersimpan lokal, tetapi database belum merespons.", { description: error.message }) }); toast.success("Profil penjual terverifikasi"); };
+  const addProduct = (event: React.FormEvent) => { event.preventDefault(); const price = Number(productForm.price); const stock = Number(productForm.stock); if (!profile || !productForm.name || !price || stock < 0) return toast.error("Isi nama produk, harga, dan stok dengan benar."); createProduct.mutate({ whatsapp: profile.phone, name: productForm.name, category: productForm.category, price, stock }, { onError: (error) => toast.error("Produk belum tersimpan di database.", { description: error.message }) }); setProducts((current) => [{ id: `seller-${Date.now()}`, name: productForm.name, category: productForm.category, price, stock, createdAt: new Date().toISOString() }, ...current]); setProductForm({ name: "", category: "Kuliner", price: "", stock: "" }); toast.success("Produk berhasil ditambahkan ke katalog penjual."); };
   const logout = () => { window.localStorage.removeItem(SELLER_SESSION_KEY); setProfile(null); setVerifyStep("profile"); setPanel("products"); toast.success("Anda sudah keluar dari portal penjual."); };
   const rupiah = (value: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
 

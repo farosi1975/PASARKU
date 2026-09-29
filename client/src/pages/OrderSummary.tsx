@@ -5,6 +5,7 @@ import { formatRupiah } from "@/data/catalog";
 import type { CartItem } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { buildAdminWhatsAppLink } from "@/lib/whatsapp";
+import { trpc } from "@/lib/trpc";
 
 type StoredOrder = {
   id: string;
@@ -19,6 +20,7 @@ type StoredOrder = {
   total: number;
   payment: string;
   createdAt: string;
+  status?: string;
 };
 
 function readOrder(orderId: string | undefined): StoredOrder | null {
@@ -30,8 +32,12 @@ function readOrder(orderId: string | undefined): StoredOrder | null {
 
 export default function OrderSummary() {
   const [, params] = useRoute("/pesanan/:id");
-  const order = readOrder(params?.id);
+  const remote = trpc.marketplace.order.useQuery({ orderCode: params?.id || "" }, { enabled: Boolean(params?.id), refetchInterval: 10000 });
+  const localOrder = readOrder(params?.id);
+  const remoteOrder: StoredOrder | null = remote.data ? { id: remote.data.orderCode, customer: remote.data.customerName, whatsapp: remote.data.whatsapp, village: remote.data.village, address: remote.data.address, note: remote.data.note || "", items: remote.data.items.map((item) => ({ id: String(item.id), name: item.productName, vendor: "Mitra PASARKU", category: "Produk lokal", price: item.price, quantity: item.quantity, unit: "", accent: "sunset", emoji: "🛍️", description: "", location: "Sawahan", eta: "30–45 menit" })), subtotal: remote.data.subtotal, delivery: remote.data.delivery, total: remote.data.total, payment: remote.data.payment, createdAt: new Date(remote.data.createdAt).toISOString(), status: remote.data.status } : null;
+  const order = localOrder || remoteOrder;
   const [copied, setCopied] = useState(false);
+  if (!order && remote.isLoading) return <div className="app-shell"><main className="order-empty"><div className="empty-icon"><Clock3 size={24} /></div><h1>Memuat nota...</h1><p>Mengambil pesanan dari server PASARKU.</p></main></div>;
   if (!order) return <div className="app-shell"><header className="site-header"><div className="container-wide header-inner"><Link href="/" className="brand"><span className="brand-mark">P</span><span>PASAR<span>KU</span></span></Link></div></header><main className="order-empty"><div className="empty-icon"><ShoppingBag size={24} /></div><h1>Nota tidak ditemukan</h1><p>Nota ini tersimpan sementara di browser yang digunakan saat checkout.</p><Link href="/" className="primary-button">Kembali ke katalog</Link></main></div>;
   const copyId = async () => { await navigator.clipboard?.writeText(`#${order.id}`); setCopied(true); toast.success("ID pesanan disalin"); window.setTimeout(() => setCopied(false), 1800); };
   const formattedDate = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(order.createdAt));
