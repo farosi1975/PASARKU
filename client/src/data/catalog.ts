@@ -18,7 +18,9 @@ export type OrderStatus = "Menunggu" | "Diproses" | "Diantar" | "Selesai";
 export type MockOrder = {
   id: string;
   customer: string;
+  whatsapp?: string;
   village: string;
+  address?: string;
   total: number;
   items: number;
   payment: "COD" | "Transfer";

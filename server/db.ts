@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { ENV } from "./_core/env";
-import { InsertUser, courierProfiles, orderItems, orders, products, sellerProfiles, users } from "../drizzle/schema";
+import { InsertUser, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, users } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -43,6 +43,17 @@ export async function listSellerProducts(whatsapp: string) {
   const sellers = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1);
   if (!sellers[0]) return [];
   return db.select().from(products).where(eq(products.sellerId, sellers[0].id)).orderBy(desc(products.createdAt));
+}
+
+export async function getBuyerProfile(whatsapp: string) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(buyerProfiles).where(eq(buyerProfiles.whatsapp, whatsapp)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listBuyerProfiles() {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(buyerProfiles).orderBy(desc(buyerProfiles.updatedAt));
 }
 
 export async function listOrders() {

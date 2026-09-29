@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Check, Eye, LockKeyhole, MessageCircle, Phone, R
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { AUTH_EVENT, normalizeWhatsApp, SIMULATED_OTP, USER_SESSION_KEY } from "@/lib/auth";
+import { trpc } from "@/lib/trpc";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -13,6 +14,7 @@ export default function Login() {
   const [otp, setOtp] = useState("");
   const [sentTo, setSentTo] = useState("");
   const [showDemo, setShowDemo] = useState(false);
+  const saveBuyerProfile = trpc.marketplace.saveBuyerProfile.useMutation();
 
   const requestOtp = (event: React.FormEvent) => {
     event.preventDefault();
@@ -25,10 +27,17 @@ export default function Login() {
     toast.success("Kode OTP simulasi siap", { description: `Kode dikirim ke +${normalized} (simulasi).` });
   };
 
-  const verifyOtp = (event: React.FormEvent) => {
+  const verifyOtp = async (event: React.FormEvent) => {
     event.preventDefault();
     if (otp !== SIMULATED_OTP) return toast.error("Kode OTP belum benar. Gunakan kode simulasi yang ditampilkan.");
     const displayName = mode === "register" ? name.trim() : `Warga ${sentTo.slice(-4)}`;
+    if (mode === "register") {
+      try {
+        await saveBuyerProfile.mutateAsync({ name: displayName, whatsapp: sentTo, village: "Sawahan", address: "" });
+      } catch {
+        toast.warning("Akun dibuat, tetapi profil belum tersinkron", { description: "Profil dapat dilengkapi dari menu Profil pengguna." });
+      }
+    }
     window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify({ name: displayName, phone: sentTo, mode, signedInAt: new Date().toISOString() }));
     window.dispatchEvent(new Event(AUTH_EVENT));
     toast.success(mode === "register" ? "Akun berhasil dibuat" : "Berhasil masuk", { description: `Selamat datang di PASARKU, ${displayName}.` });

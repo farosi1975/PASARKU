@@ -53,7 +53,7 @@ function Header({ onCart }: { onCart: () => void }) {
             <ShoppingBag size={18} />
             {count > 0 && <span className="cart-count">{count}</span>}
           </button>
-          {userName ? <div className="profile-menu"><button className="profile-trigger" onClick={() => setProfileOpen((current) => !current)} aria-expanded={profileOpen}><span className="profile-avatar">{userName.charAt(0).toUpperCase()}</span><span className="profile-name">{userName}</span><ChevronDown size={14} /></button>{profileOpen && <div className="profile-dropdown"><div className="profile-dropdown-heading"><span className="profile-avatar large">{userName.charAt(0).toUpperCase()}</span><div><strong>{userName}</strong><small>Pengguna PASARKU</small></div></div><button className="profile-item" onClick={() => toast("Profil pengguna akan dilengkapi pada tahap berikutnya.")}><UserRound size={15} /> Profil pengguna</button><button className="profile-item" onClick={() => toast("Pengaturan akun akan tersedia setelah login nyata diaktifkan.")}><Settings size={15} /> Pengaturan</button><div className="profile-divider"></div><button className="profile-item danger" onClick={logout}><LogOutIcon /> Keluar</button></div>}</div> : <Link href="/masuk" className="login-button">Masuk</Link>}
+          {userName ? <div className="profile-menu"><button className="profile-trigger" onClick={() => setProfileOpen((current) => !current)} aria-expanded={profileOpen}><span className="profile-avatar">{userName.charAt(0).toUpperCase()}</span><span className="profile-name">{userName}</span><ChevronDown size={14} /></button>{profileOpen && <div className="profile-dropdown"><div className="profile-dropdown-heading"><span className="profile-avatar large">{userName.charAt(0).toUpperCase()}</span><div><strong>{userName}</strong><small>Pengguna PASARKU</small></div></div><Link href="/profil" className="profile-item" onClick={() => setProfileOpen(false)}><UserRound size={15} /> Profil pengguna</Link><Link href="/profil" className="profile-item" onClick={() => setProfileOpen(false)}><Settings size={15} /> Pengaturan</Link><div className="profile-divider"></div><button className="profile-item danger" onClick={logout}><LogOutIcon /> Keluar</button></div>}</div> : <Link href="/masuk" className="login-button">Masuk</Link>}
         </div>
       </div>
     </header>
@@ -109,7 +109,28 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   const [, navigate] = useLocation();
   const { items, subtotal, clearCart } = useCart();
   const createOrder = trpc.marketplace.createOrder.useMutation();
+  const [buyerPhone, setBuyerPhone] = useState("");
   const [form, setForm] = useState({ name: "", whatsapp: "", village: "Sawahan", address: "", note: "" });
+  const buyerProfile = trpc.marketplace.buyerProfile.useQuery({ whatsapp: buyerPhone || "0000000000" }, { enabled: buyerPhone.length >= 10 });
+  useEffect(() => {
+    const loadBuyer = () => {
+      try {
+        const session = JSON.parse(window.localStorage.getItem(USER_SESSION_KEY) || "null") as { name?: string; phone?: string } | null;
+        const phone = session?.phone || "";
+        setBuyerPhone(phone);
+        if (session) setForm((current) => ({ ...current, name: current.name || session.name || "", whatsapp: current.whatsapp || phone }));
+      } catch {
+        setBuyerPhone("");
+      }
+    };
+    loadBuyer();
+    window.addEventListener(AUTH_EVENT, loadBuyer);
+    return () => window.removeEventListener(AUTH_EVENT, loadBuyer);
+  }, []);
+  useEffect(() => {
+    const profile = buyerProfile.data;
+    if (open && profile) setForm((current) => ({ ...current, name: profile.name, whatsapp: profile.whatsapp, village: profile.village, address: profile.address || "" }));
+  }, [buyerProfile.data, open]);
   if (!open) return null;
   const total = calculateOrderTotal(subtotal);
   const submit = async (event: React.FormEvent) => {
@@ -131,7 +152,7 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
     window.setTimeout(() => navigate(`/pesanan/${orderId}`), 300);
   };
   const setField = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  return <div className="checkout-backdrop"><div className="checkout-modal"><div className="drawer-heading"><div><span className="eyebrow">Langkah terakhir</span><h2>Checkout COD</h2></div><button className="close-button" onClick={onClose}><X size={20} /></button></div><form onSubmit={submit} className="checkout-form"><div className="form-grid"><label>Nama penerima<input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Contoh: Sari Wulandari" /></label><label>No. WhatsApp<input value={form.whatsapp} onChange={(e) => setField("whatsapp", e.target.value)} placeholder="08xxxxxxxxxx" /></label></div><label>Desa / wilayah<select value={form.village} onChange={(e) => setField("village", e.target.value)}><option>Sawahan</option><option>Bareng</option><option>Duren</option><option>Margopatut</option></select></label><label>Alamat lengkap<input value={form.address} onChange={(e) => setField("address", e.target.value)} placeholder="Dusun, RT/RW, patokan rumah" /></label><label>Catatan untuk kurir <span className="optional">opsional</span><textarea value={form.note} onChange={(e) => setField("note", e.target.value)} placeholder="Contoh: titip di warung depan rumah" rows={3} /></label><div className="payment-choice"><div className="payment-icon">▣</div><div><strong>Bayar di tempat (COD)</strong><span>Kurir membawa nota digital dan menagih saat barang sampai.</span></div><Check size={18} /></div><div className="checkout-total"><span>Total yang dibayar</span><strong>{formatRupiah(total)}</strong></div><button className="primary-button full-width" type="submit">Buat pesanan <ArrowRight size={17} /></button><p className="fine-print">Setelah dibuat, Admin PASARKU dapat dihubungi via WhatsApp untuk konfirmasi.</p></form></div></div>;
+  return <div className="checkout-backdrop"><div className="checkout-modal"><div className="drawer-heading"><div><span className="eyebrow">Langkah terakhir</span><h2>Checkout COD</h2></div><button className="close-button" onClick={onClose}><X size={20} /></button></div><form onSubmit={submit} className="checkout-form"><div className="profile-sync-note"><UserRound size={15} /> {buyerProfile.data ? "Data profil tersimpan otomatis." : "Lengkapi data ini agar Admin dapat menghubungi Anda."}</div><div className="form-grid"><label>Nama penerima<input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Contoh: Sari Wulandari" /></label><label>No. WhatsApp<input value={form.whatsapp} onChange={(e) => setField("whatsapp", e.target.value)} placeholder="08xxxxxxxxxx" /></label></div><label>Desa / wilayah<select value={form.village} onChange={(e) => setField("village", e.target.value)}><option>Sawahan</option><option>Bareng</option><option>Duren</option><option>Margopatut</option></select></label><label>Alamat lengkap<input value={form.address} onChange={(e) => setField("address", e.target.value)} placeholder="Dusun, RT/RW, patokan rumah" /></label><label>Catatan untuk kurir <span className="optional">opsional</span><textarea value={form.note} onChange={(e) => setField("note", e.target.value)} placeholder="Contoh: titip di warung depan rumah" rows={3} /></label><div className="payment-choice"><div className="payment-icon">▣</div><div><strong>Bayar di tempat (COD)</strong><span>Kurir membawa nota digital dan menagih saat barang sampai.</span></div><Check size={18} /></div><div className="checkout-total"><span>Total yang dibayar</span><strong>{formatRupiah(total)}</strong></div><button className="primary-button full-width" type="submit">Buat pesanan <ArrowRight size={17} /></button><p className="fine-print">Setelah dibuat, Admin PASARKU dapat dihubungi via WhatsApp untuk konfirmasi.</p></form></div></div>;
 }
 
 export default function Home() {

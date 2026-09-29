@@ -15,6 +15,13 @@
       "when": 1790648472973,
       "tag": "0001_cool_starhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1790721634023,
+      "tag": "0002_handy_rogue",
+      "breakpoints": true
     }
   ]
 }

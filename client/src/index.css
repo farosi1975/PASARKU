@@ -201,6 +201,8 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .checkout-backdrop { display: grid; place-items: center; padding: 22px; }
 .checkout-modal { width: min(550px, 100%); max-height: calc(100vh - 44px); overflow-y: auto; padding: 28px; border-radius: 20px; background: #fffdf9; box-shadow: 0 24px 80px rgba(38,28,22,.24); animation: popIn .24s cubic-bezier(.23,1,.32,1); }
 @keyframes popIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.profile-sync-note { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: #fff4ec; color: #9b4d2d; font-size: 12px; font-weight: 600; }
+
 .checkout-form { display: grid; gap: 15px; margin-top: 25px; }
 .checkout-form label { display: grid; gap: 7px; color: #59544d; font-size: 10px; font-weight: 800; }
 .checkout-form input, .checkout-form select, .checkout-form textarea { width: 100%; padding: 12px 13px; border: 1px solid var(--line); outline: none; border-radius: 9px; color: var(--ink); background: #fff; font-size: 11px; resize: vertical; }
@@ -834,3 +836,5 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .verified-courier-empty { padding: 15px 0; color: var(--muted); font-size: 9px; text-align: center; }
 .courier-auth-switch { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 15px; color: #948c83; font-size: 8px; }
 .courier-auth-switch button { padding: 0; border: 0; color: var(--orange-dark); background: transparent; font-size: 8px; font-weight: 800; }
+
+.customer-address { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

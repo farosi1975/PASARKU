@@ -3,8 +3,8 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getDashboardStats, getDb, getOrderWithItems, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerProducts } from "./db";
-import { courierProfiles, orderItems, orders, products, sellerProfiles } from "../drizzle/schema";
+import { getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerProducts } from "./db";
+import { buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -34,8 +34,14 @@ export const appRouter = router({
       const db = await dbRequired(); await db.insert(courierProfiles).values({ ...input, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { name: input.name, vehicle: input.vehicle, verifiedAt: new Date() } });
       const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, input.whatsapp)).limit(1); return rows[0];
     }),
+    buyerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => getBuyerProfile(input.whatsapp)),
+    saveBuyerProfile: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().optional() })).mutation(async ({ input }) => {
+      const db = await dbRequired();
+      await db.insert(buyerProfiles).values(input).onDuplicateKeyUpdate({ set: { name: input.name, village: input.village, address: input.address ?? null } });
+      return getBuyerProfile(input.whatsapp);
+    }),
     createOrder: publicProcedure.input(z.object({ customerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().min(3), note: z.string().optional(), subtotal: z.number().int().nonnegative(), delivery: z.number().int().nonnegative(), total: z.number().int().nonnegative(), payment: z.string().min(2), items: z.array(z.object({ productId: z.number().int().optional(), productName: z.string(), price: z.number().int(), quantity: z.number().int().positive() })).min(1) })).mutation(async ({ input }) => {
-      const db = await dbRequired(); const orderCode = `INV-${Date.now()}`; const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp: input.whatsapp, village: input.village, address: input.address, note: input.note, subtotal: input.subtotal, delivery: input.delivery, total: input.total, payment: input.payment, status: "Menunggu" }); const orderId = Number((result as any)[0]?.insertId ?? 0); await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity }))); return getOrderWithItems(orderCode);
+      const db = await dbRequired(); const orderCode = `INV-${Date.now()}`; await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp: input.whatsapp, village: input.village, address: input.address }).onDuplicateKeyUpdate({ set: { name: input.customerName, village: input.village, address: input.address } }); const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp: input.whatsapp, village: input.village, address: input.address, note: input.note, subtotal: input.subtotal, delivery: input.delivery, total: input.total, payment: input.payment, status: "Menunggu" }); const orderId = Number((result as any)[0]?.insertId ?? 0); await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity }))); return getOrderWithItems(orderCode);
     }),
     orders: publicProcedure.query(() => listOrders()),
     dashboardStats: publicProcedure.query(() => getDashboardStats()),
