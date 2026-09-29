@@ -816,3 +816,21 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .assignment-button { min-height: 40px; white-space: nowrap; }
 .assignment-button:disabled { opacity: .52; cursor: not-allowed; box-shadow: none; }
 @media (max-width: 900px) { .assignment-panel { align-items: stretch; flex-direction: column; } .assignment-fields { align-items: stretch; flex-direction: column; } .assignment-fields select, .assignment-button { width: 100%; } }
+
+/* Verified courier list */
+.orders-panel, .activity-panel, .quick-panel, .verified-couriers-panel { border: 1px solid #e9e5df; border-radius: 14px; background: #fffdf9; }
+.activity-panel > .panel-heading > svg, .quick-panel > .panel-heading > svg, .verified-couriers-panel > .panel-heading > svg { color: var(--orange); }
+.verified-couriers-panel { overflow: hidden; }
+.verified-couriers-panel .panel-heading { padding-bottom: 14px; }
+.verified-courier-list { padding: 0 20px 10px; }
+.verified-courier-row { display: flex; align-items: center; gap: 9px; padding: 11px 0; border-bottom: 1px solid #f0ece6; }
+.verified-courier-row:last-child { border-bottom: 0; }
+.verified-courier-avatar { width: 29px; height: 29px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; color: #fff; background: var(--green); font-size: 10px; font-weight: 800; }
+.verified-courier-row > div:nth-child(2) { min-width: 0; flex: 1; }
+.verified-courier-row strong, .verified-courier-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.verified-courier-row strong { color: var(--ink); font-size: 10px; }
+.verified-courier-row small { margin-top: 3px; color: var(--muted); font-size: 8px; }
+.courier-ready-badge { padding: 4px 6px; border-radius: 6px; color: var(--green-dark); background: #eaf6eb; font-size: 7px; font-weight: 800; }
+.verified-courier-empty { padding: 15px 0; color: var(--muted); font-size: 9px; text-align: center; }
+.courier-auth-switch { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 15px; color: #948c83; font-size: 8px; }
+.courier-auth-switch button { padding: 0; border: 0; color: var(--orange-dark); background: transparent; font-size: 8px; font-weight: 800; }
