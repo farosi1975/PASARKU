@@ -802,3 +802,17 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .courier-select:focus { outline: 3px solid rgba(239, 101, 61, 0.18); border-color: #ef653d; }
 .courier-select:disabled { opacity: .6; cursor: not-allowed; }
 @media (max-width: 900px) { .courier-select { min-width: 128px; max-width: 150px; } }
+
+/* Visible admin courier assignment panel */
+.assignment-panel { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 18px; margin: 0 0 18px; border: 1px solid #f1d0c2; border-radius: 14px; background: linear-gradient(110deg, #fff8f3, #fffdfb); }
+.assignment-copy { display: flex; align-items: center; gap: 11px; min-width: 220px; }
+.assignment-copy strong, .assignment-copy span { display: block; }
+.assignment-copy strong { color: #3d3029; font-size: 12px; }
+.assignment-copy span { margin-top: 4px; color: #8e7d73; font-size: 10px; line-height: 1.45; }
+.assignment-icon { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 10px; color: #d65634; background: #fbe4d9; }
+.assignment-fields { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 1; }
+.assignment-fields select { min-width: 150px; min-height: 40px; padding: 0 10px; border: 1px solid #e9ddd5; border-radius: 10px; color: #493d36; background: #fff; font-size: 11px; font-weight: 650; }
+.assignment-fields select:focus { outline: 3px solid rgba(239, 101, 61, .16); border-color: #ef653d; }
+.assignment-button { min-height: 40px; white-space: nowrap; }
+.assignment-button:disabled { opacity: .52; cursor: not-allowed; box-shadow: none; }
+@media (max-width: 900px) { .assignment-panel { align-items: stretch; flex-direction: column; } .assignment-fields { align-items: stretch; flex-direction: column; } .assignment-fields select, .assignment-button { width: 100%; } }
