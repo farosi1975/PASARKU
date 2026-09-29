@@ -67,3 +67,19 @@ export async function listCouriers() {
   const db = await getDb(); if (!db) return [];
   return db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle }).from(courierProfiles).orderBy(courierProfiles.name);
 }
+
+export async function getDashboardStats() {
+  const db = await getDb();
+  if (!db) return { activeOrders: 0, registeredStores: 0, readyCouriers: 0, revenue: 0 };
+  const [orderRows, storeRows, courierRows] = await Promise.all([
+    db.select({ status: orders.status, total: orders.total }).from(orders),
+    db.select({ id: sellerProfiles.id }).from(sellerProfiles),
+    db.select({ id: courierProfiles.id }).from(courierProfiles),
+  ]);
+  return {
+    activeOrders: orderRows.filter((order) => order.status !== "Selesai" && order.status !== "Dibatalkan").length,
+    registeredStores: storeRows.length,
+    readyCouriers: courierRows.length,
+    revenue: orderRows.reduce((sum, order) => sum + order.total, 0),
+  };
+}
