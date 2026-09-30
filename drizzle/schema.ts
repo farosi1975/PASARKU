@@ -43,6 +43,15 @@ export const buyerProfiles = mysqlTable("buyer_profiles", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const adminProfiles = mysqlTable("admin_profiles", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 160 }).notNull(),
+  whatsapp: varchar("whatsapp", { length: 32 }).notNull().unique(),
+  verifiedAt: timestamp("verifiedAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   sellerId: int("sellerId"),
@@ -90,5 +99,6 @@ export type Product = typeof products.$inferSelect;
 export type SellerProfile = typeof sellerProfiles.$inferSelect;
 export type CourierProfile = typeof courierProfiles.$inferSelect;
 export type BuyerProfile = typeof buyerProfiles.$inferSelect;
+export type AdminProfile = typeof adminProfiles.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
