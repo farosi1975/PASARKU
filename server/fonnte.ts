@@ -34,10 +34,14 @@ export async function getFonnteDevices() {
 }
 
 export async function sendFonnteMessage(target: string, message: string) {
+  const devices = await getFonnteDevices();
+  const connectedDevice = Array.isArray(devices.data) ? devices.data.find((device) => device && typeof device === "object" && (device as { status?: string }).status === "connect") : undefined;
+  const deviceToken = connectedDevice && typeof connectedDevice === "object" ? (connectedDevice as { token?: string }).token : undefined;
+  if (!deviceToken) throw new Error("Tidak ada device FONNTE yang terhubung untuk mengirim OTP.");
   const body = new URLSearchParams({ target, message, countryCode: "62", connectOnly: "true" });
   const response = await fetch(`${FONNTE_API_URL}/send`, {
     method: "POST",
-    headers: { Authorization: getFonnteToken(), "Content-Type": "application/x-www-form-urlencoded" },
+    headers: { Authorization: deviceToken, "Content-Type": "application/x-www-form-urlencoded" },
     body,
     signal: AbortSignal.timeout(15_000),
   });

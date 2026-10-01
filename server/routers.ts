@@ -15,6 +15,7 @@ const dbRequired = async () => { const db = await getDb(); if (!db) throw new TR
 const adminSessionToken = z.string().min(32).max(128);
 const adminChallenges = new Map<string, { otp: string; expiresAt: number }>();
 const adminSessions = new Map<string, { whatsapp: string; expiresAt: number }>();
+const buyerChallenges = new Map<string, { otp: string; name?: string; expiresAt: number }>();
 const normalizePhone = (value: string) => { const digits = value.replace(/\D/g, ""); return digits.startsWith("0") ? `62${digits.slice(1)}` : digits; };
 const requireAdminSession = async (token: string) => {
   const session = adminSessions.get(token);
@@ -32,6 +33,31 @@ export const appRouter = router({
   }),
   marketplace: router({
     products: publicProcedure.query(() => listApprovedProducts()),
+    requestBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2).optional() })).mutation(async ({ input }) => {
+      const whatsapp = normalizePhone(input.whatsapp);
+      const otp = String(randomInt(100000, 1000000));
+      buyerChallenges.set(whatsapp, { otp, name: input.name?.trim(), expiresAt: Date.now() + 5 * 60 * 1000 });
+      try {
+        await sendFonnteMessage(whatsapp, `Kode OTP PASARKU: ${otp}. Berlaku 5 menit. Jangan bagikan kode ini.`);
+      } catch (error) {
+        buyerChallenges.delete(whatsapp);
+        throw new TRPCError({ code: "BAD_GATEWAY", message: error instanceof Error ? error.message : "OTP FONNTE gagal dikirim." });
+      }
+      return { success: true, expiresIn: 300 } as const;
+    }),
+    verifyBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, otp: z.string().regex(/^\d{6}$/) })).mutation(async ({ input }) => {
+      const whatsapp = normalizePhone(input.whatsapp);
+      const challenge = buyerChallenges.get(whatsapp);
+      if (!challenge || challenge.expiresAt < Date.now() || challenge.otp !== input.otp) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP belum benar atau sudah kedaluwarsa." });
+      buyerChallenges.delete(whatsapp);
+      const existing = await getBuyerProfile(whatsapp);
+      const displayName = existing?.name || challenge.name || `Warga ${whatsapp.slice(-4)}`;
+      if (!existing) {
+        const db = await dbRequired();
+        await db.insert(buyerProfiles).values({ name: displayName, whatsapp, village: "Sawahan", address: "" });
+      }
+      return { name: displayName, whatsapp };
+    }),
     requestAdminOtp: publicProcedure.input(z.object({ whatsapp: phone })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
       const profile = await getAdminProfile(whatsapp);
