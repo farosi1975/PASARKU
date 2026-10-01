@@ -3,9 +3,10 @@ import { ArrowLeft, Check, MapPin, MessageCircle, Save, UserRound } from "lucide
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { AUTH_EVENT, normalizeWhatsApp, USER_SESSION_KEY } from "@/lib/auth";
+import { SAWAHAN_VILLAGES } from "@/lib/locations";
 import { trpc } from "@/lib/trpc";
 
-const villages = ["Sawahan", "Bareng", "Duren", "Margopatut"];
+const villages = SAWAHAN_VILLAGES;
 
 type BuyerSession = { name?: string; phone?: string };
 
