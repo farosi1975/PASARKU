@@ -16,6 +16,8 @@ const adminSessionToken = z.string().min(32).max(128);
 const adminChallenges = new Map<string, { otp: string; expiresAt: number }>();
 const adminSessions = new Map<string, { whatsapp: string; expiresAt: number }>();
 const buyerChallenges = new Map<string, { otp: string; name?: string; expiresAt: number }>();
+const sellerChallenges = new Map<string, { otp: string; shopName: string; ownerName: string; village: string; expiresAt: number }>();
+const courierChallenges = new Map<string, { otp: string; name: string; vehicle: string; expiresAt: number }>();
 const normalizePhone = (value: string) => { const digits = value.replace(/\D/g, ""); return digits.startsWith("0") ? `62${digits.slice(1)}` : digits; };
 const requireAdminSession = async (token: string) => {
   const session = adminSessions.get(token);
@@ -93,6 +95,20 @@ export const appRouter = router({
       return getAdminProfile(whatsapp);
     }),
     sellerProducts: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => listSellerProducts(input.whatsapp)),
+    requestSellerOtp: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2) })).mutation(async ({ input }) => {
+      const whatsapp = normalizePhone(input.whatsapp);
+      const otp = String(randomInt(100000, 1000000));
+      sellerChallenges.set(whatsapp, { otp, shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, expiresAt: Date.now() + 5 * 60 * 1000 });
+      try { await sendFonnteMessage(whatsapp, `Kode OTP Penjual PASARKU: ${otp}. Berlaku 5 menit. Jangan bagikan kode ini.`); }
+      catch (error) { sellerChallenges.delete(whatsapp); throw new TRPCError({ code: "BAD_GATEWAY", message: error instanceof Error ? error.message : "OTP FONNTE gagal dikirim." }); }
+      return { success: true, expiresIn: 300 } as const;
+    }),
+    verifySellerOtp: publicProcedure.input(z.object({ whatsapp: phone, otp: z.string().regex(/^\d{6}$/) })).mutation(async ({ input }) => {
+      const whatsapp = normalizePhone(input.whatsapp); const challenge = sellerChallenges.get(whatsapp);
+      if (!challenge || challenge.expiresAt < Date.now() || challenge.otp !== input.otp) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP penjual belum benar atau sudah kedaluwarsa." });
+      const db = await dbRequired(); await db.insert(sellerProfiles).values({ shopName: challenge.shopName, ownerName: challenge.ownerName, whatsapp, village: challenge.village, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { shopName: challenge.shopName, ownerName: challenge.ownerName, village: challenge.village, verifiedAt: new Date() } });
+      sellerChallenges.delete(whatsapp); const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
+    }),
     registerSeller: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2) })).mutation(async ({ input }) => {
       const db = await dbRequired();
       await db.insert(sellerProfiles).values({ ...input, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { shopName: input.shopName, ownerName: input.ownerName, village: input.village, verifiedAt: new Date() } });
@@ -102,6 +118,19 @@ export const appRouter = router({
       const db = await dbRequired(); const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, input.whatsapp)).limit(1); if (!seller[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Profil penjual belum terverifikasi." });
       const result = await db.insert(products).values({ sellerId: seller[0].id, name: input.name, category: input.category, price: input.price, stock: input.stock, vendor: seller[0].shopName, location: seller[0].village, status: "approved" });
       return { id: Number((result as any)[0]?.insertId ?? 0), status: "approved" as const };
+    }),
+    requestCourierOtp: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, vehicle: z.string().min(2) })).mutation(async ({ input }) => {
+      const whatsapp = normalizePhone(input.whatsapp); const otp = String(randomInt(100000, 1000000));
+      courierChallenges.set(whatsapp, { otp, name: input.name.trim(), vehicle: input.vehicle, expiresAt: Date.now() + 5 * 60 * 1000 });
+      try { await sendFonnteMessage(whatsapp, `Kode OTP Kurir PASARKU: ${otp}. Berlaku 5 menit. Jangan bagikan kode ini.`); }
+      catch (error) { courierChallenges.delete(whatsapp); throw new TRPCError({ code: "BAD_GATEWAY", message: error instanceof Error ? error.message : "OTP FONNTE gagal dikirim." }); }
+      return { success: true, expiresIn: 300 } as const;
+    }),
+    verifyCourierOtp: publicProcedure.input(z.object({ whatsapp: phone, otp: z.string().regex(/^\d{6}$/) })).mutation(async ({ input }) => {
+      const whatsapp = normalizePhone(input.whatsapp); const challenge = courierChallenges.get(whatsapp);
+      if (!challenge || challenge.expiresAt < Date.now() || challenge.otp !== input.otp) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP kurir belum benar atau sudah kedaluwarsa." });
+      const db = await dbRequired(); await db.insert(courierProfiles).values({ name: challenge.name, whatsapp, vehicle: challenge.vehicle, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { name: challenge.name, vehicle: challenge.vehicle, verifiedAt: new Date() } });
+      courierChallenges.delete(whatsapp); const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),
     registerCourier: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, vehicle: z.string().min(2) })).mutation(async ({ input }) => {
       const db = await dbRequired(); await db.insert(courierProfiles).values({ ...input, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { name: input.name, vehicle: input.vehicle, verifiedAt: new Date() } });
