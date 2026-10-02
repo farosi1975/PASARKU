@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { ENV } from "./_core/env";
-import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, users } from "../drizzle/schema";
+import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, userAccounts, users } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -65,6 +65,20 @@ export async function getAdminProfile(whatsapp: string) {
 export async function listAdminProfiles() {
   const db = await getDb(); if (!db) return [];
   return db.select().from(adminProfiles).orderBy(desc(adminProfiles.createdAt));
+}
+
+export async function upsertAccountRole(whatsapp: string, role: "buyer" | "seller" | "courier" | "admin", displayName: string) {
+  const db = await getDb(); if (!db) return null;
+  const roleField = { buyer: "isBuyer", seller: "isSeller", courier: "isCourier", admin: "isAdmin" }[role];
+  await db.insert(userAccounts).values({ whatsapp, displayName, [roleField]: 1 }).onDuplicateKeyUpdate({ set: { displayName, [roleField]: 1, updatedAt: new Date() } });
+  const rows = await db.select().from(userAccounts).where(eq(userAccounts.whatsapp, whatsapp)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getAccountRoles(whatsapp: string) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(userAccounts).where(eq(userAccounts.whatsapp, whatsapp)).limit(1);
+  return rows[0] ?? null;
 }
 
 export async function listOrders() {

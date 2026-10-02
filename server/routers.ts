@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getAdminProfile, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerProducts } from "./db";
+import { getAccountRoles, getAdminProfile, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerProducts, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -76,6 +76,7 @@ export const appRouter = router({
         const db = await dbRequired();
         await db.insert(buyerProfiles).values({ name: displayName, whatsapp, village: "Sawahan", address: "" });
       }
+      await upsertAccountRole(whatsapp, "buyer", displayName);
       return { name: displayName, whatsapp };
     }),
     requestAdminOtp: publicProcedure.input(z.object({ whatsapp: phone })).mutation(async ({ input }) => {
@@ -102,6 +103,7 @@ export const appRouter = router({
       const profile = await getAdminProfile(whatsapp);
       if (!profile) throw new TRPCError({ code: "FORBIDDEN", message: "Admin tidak terverifikasi." });
       adminChallenges.delete(whatsapp);
+      await upsertAccountRole(whatsapp, "admin", profile.name);
       const sessionToken = randomBytes(32).toString("hex");
       adminSessions.set(sessionToken, { whatsapp, expiresAt: Date.now() + 8 * 60 * 60 * 1000 });
       return { sessionToken, admin: profile };
@@ -130,7 +132,7 @@ export const appRouter = router({
       if (!challenge || challenge.expiresAt < Date.now()) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP penjual belum benar atau sudah kedaluwarsa. Minta OTP baru." });
       if (challenge.otp !== input.otp) { const error = invalidOtp(challenge, "OTP penjual belum benar."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) sellerChallenges.delete(whatsapp); throw error; }
       const db = await dbRequired(); await db.insert(sellerProfiles).values({ shopName: challenge.shopName, ownerName: challenge.ownerName, whatsapp, village: challenge.village, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { shopName: challenge.shopName, ownerName: challenge.ownerName, village: challenge.village, verifiedAt: new Date() } });
-      sellerChallenges.delete(whatsapp); const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
+      sellerChallenges.delete(whatsapp); const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); await upsertAccountRole(whatsapp, "seller", challenge.ownerName); return rows[0];
     }),
     registerSeller: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2) })).mutation(async ({ input }) => {
       const db = await dbRequired();
@@ -154,13 +156,14 @@ export const appRouter = router({
       if (!challenge || challenge.expiresAt < Date.now()) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP kurir belum benar atau sudah kedaluwarsa. Minta OTP baru." });
       if (challenge.otp !== input.otp) { const error = invalidOtp(challenge, "OTP kurir belum benar."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) courierChallenges.delete(whatsapp); throw error; }
       const db = await dbRequired(); await db.insert(courierProfiles).values({ name: challenge.name, whatsapp, vehicle: challenge.vehicle, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { name: challenge.name, vehicle: challenge.vehicle, verifiedAt: new Date() } });
-      courierChallenges.delete(whatsapp); const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
+      courierChallenges.delete(whatsapp); const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); await upsertAccountRole(whatsapp, "courier", challenge.name); return rows[0];
     }),
     registerCourier: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, vehicle: z.string().min(2) })).mutation(async ({ input }) => {
       const db = await dbRequired(); await db.insert(courierProfiles).values({ ...input, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { name: input.name, vehicle: input.vehicle, verifiedAt: new Date() } });
       const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, input.whatsapp)).limit(1); return rows[0];
     }),
     buyerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => getBuyerProfile(input.whatsapp)),
+    accountRoles: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => getAccountRoles(normalizePhone(input.whatsapp))),
     saveBuyerProfile: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().optional() })).mutation(async ({ input }) => {
       const db = await dbRequired();
       await db.insert(buyerProfiles).values(input).onDuplicateKeyUpdate({ set: { name: input.name, village: input.village, address: input.address ?? null } });

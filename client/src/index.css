@@ -843,3 +843,20 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .admin-form-heading { display: flex; align-items: center; gap: 7px; color: #6f3c2a; font-size: 12px; }
 .admin-add-form input { width: 100%; border: 1px solid #e5ddd6; border-radius: 10px; padding: 10px 11px; background: #fff; color: #302924; font: inherit; font-size: 12px; outline: none; }
 .admin-add-form input:focus { border-color: #e66b43; box-shadow: 0 0 0 3px rgba(230, 107, 67, .12); }
+
+
+.role-switch-card { margin-top: 20px; padding: 18px; border: 1px solid rgba(224, 99, 55, .2); border-radius: 18px; background: rgba(255, 248, 241, .78); }
+.role-switch-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; color: var(--ink); }
+.role-switch-heading h2 { margin: 3px 0 4px; font-size: 1.25rem; }
+.role-switch-heading p { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
+.role-switch-heading > svg { color: var(--orange); flex: 0 0 auto; }
+.role-switch-grid { display: grid; gap: 9px; margin-top: 14px; }
+.role-switch-item { display: flex; align-items: center; gap: 11px; padding: 12px 13px; border: 1px solid rgba(50, 39, 56, .1); border-radius: 13px; background: rgba(255, 255, 255, .78); color: inherit; text-decoration: none; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.role-switch-item:hover { transform: translateY(-1px); border-color: rgba(224, 99, 55, .45); box-shadow: 0 8px 18px rgba(67, 46, 68, .08); }
+.role-switch-item > svg { color: var(--orange); }
+.role-switch-item span:nth-child(2) { display: grid; gap: 2px; min-width: 0; }
+.role-switch-item strong { font-size: .88rem; }
+.role-switch-item small { color: var(--muted); font-size: .75rem; }
+.role-switch-arrow { margin-left: auto; color: var(--orange); font-size: 1.1rem; }
+.role-switch-empty { color: var(--muted); font-size: .82rem; padding: 8px 0; }
+@media (max-width: 640px) { .role-switch-card { padding: 14px; } }

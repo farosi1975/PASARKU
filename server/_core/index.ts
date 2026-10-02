@@ -44,6 +44,16 @@ async function startServer() {
       createContext,
     })
   );
+  // Never let an API failure fall through to the Vite/static HTML fallback.
+  // This keeps client-side JSON parsing reliable for OTP, database, and FONNTE errors.
+  app.use("/api", (error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (res.headersSent) return next(error);
+    const message = error instanceof Error ? error.message : "Terjadi kesalahan pada layanan API.";
+    res.status(500).json({ success: false, message });
+  });
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ success: false, message: "API route tidak ditemukan." });
+  });
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
