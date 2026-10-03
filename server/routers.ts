@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getAccountRoles, getAdminProfile, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerProducts, upsertAccountRole } from "./db";
+import { getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerProducts, resetMarketplaceData, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -174,6 +174,8 @@ export const appRouter = router({
     }),
     orders: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listOrders(); }),
     dashboardStats: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getDashboardStats(); }),
+    userDirectory: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getAdminUserDirectory(); }),
+    resetMarketplaceData: publicProcedure.input(z.object({ sessionToken: adminSessionToken, confirmation: z.literal("HAPUS_DATA_NON_ADMIN") })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return resetMarketplaceData(); }),
     couriers: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listCouriers(); }),
     courierProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
       const db = await dbRequired();

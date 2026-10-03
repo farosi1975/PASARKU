@@ -67,6 +67,33 @@ export async function listAdminProfiles() {
   return db.select().from(adminProfiles).orderBy(desc(adminProfiles.createdAt));
 }
 
+export async function getAdminUserDirectory() {
+  const db = await getDb();
+  if (!db) return { buyers: [], sellers: [], couriers: [] };
+  const [buyers, sellers, couriers] = await Promise.all([
+    db.select().from(buyerProfiles).orderBy(desc(buyerProfiles.updatedAt)),
+    db.select().from(sellerProfiles).orderBy(desc(sellerProfiles.updatedAt)),
+    db.select().from(courierProfiles).orderBy(desc(courierProfiles.updatedAt)),
+  ]);
+  return { buyers, sellers, couriers };
+}
+
+export async function resetMarketplaceData() {
+  const db = await getDb();
+  if (!db) throw new Error("Database belum tersedia.");
+  await db.transaction(async (tx) => {
+    await tx.delete(orderItems);
+    await tx.delete(orders);
+    await tx.delete(products);
+    await tx.delete(buyerProfiles);
+    await tx.delete(sellerProfiles);
+    await tx.delete(courierProfiles);
+    await tx.update(userAccounts).set({ isBuyer: 0, isSeller: 0, isCourier: 0 }).where(eq(userAccounts.isAdmin, 1));
+    await tx.delete(userAccounts).where(eq(userAccounts.isAdmin, 0));
+  });
+  return { success: true as const };
+}
+
 export async function upsertAccountRole(whatsapp: string, role: "buyer" | "seller" | "courier" | "admin", displayName: string) {
   const db = await getDb(); if (!db) return null;
   const roleField = { buyer: "isBuyer", seller: "isSeller", courier: "isCourier", admin: "isAdmin" }[role];
