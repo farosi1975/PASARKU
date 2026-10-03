@@ -70,12 +70,32 @@ export async function listAdminProfiles() {
 export async function getAdminUserDirectory() {
   const db = await getDb();
   if (!db) return { buyers: [], sellers: [], couriers: [] };
-  const [buyers, sellers, couriers] = await Promise.all([
+  const [buyers, sellers, couriers, orderRows, productRows] = await Promise.all([
     db.select().from(buyerProfiles).orderBy(desc(buyerProfiles.updatedAt)),
     db.select().from(sellerProfiles).orderBy(desc(sellerProfiles.updatedAt)),
     db.select().from(courierProfiles).orderBy(desc(courierProfiles.updatedAt)),
+    db.select({ whatsapp: orders.whatsapp, orderCode: orders.orderCode, createdAt: orders.createdAt }).from(orders),
+    db.select({ sellerId: products.sellerId }).from(products),
   ]);
-  return { buyers, sellers, couriers };
+  const ordersByBuyer = new Map<string, { count: number; lastOrderCode?: string; lastOrderAt?: Date }>();
+  for (const order of orderRows) {
+    const current = ordersByBuyer.get(order.whatsapp) ?? { count: 0 };
+    current.count += 1;
+    if (!current.lastOrderAt || order.createdAt > current.lastOrderAt) {
+      current.lastOrderCode = order.orderCode;
+      current.lastOrderAt = order.createdAt;
+    }
+    ordersByBuyer.set(order.whatsapp, current);
+  }
+  const productsBySeller = new Map<number, number>();
+  for (const product of productRows) {
+    if (product.sellerId !== null) productsBySeller.set(product.sellerId, (productsBySeller.get(product.sellerId) ?? 0) + 1);
+  }
+  return {
+    buyers: buyers.map((buyer) => ({ ...buyer, orderCount: ordersByBuyer.get(buyer.whatsapp)?.count ?? 0, lastOrderCode: ordersByBuyer.get(buyer.whatsapp)?.lastOrderCode ?? null, lastOrderAt: ordersByBuyer.get(buyer.whatsapp)?.lastOrderAt ?? null })),
+    sellers: sellers.map((seller) => ({ ...seller, productCount: productsBySeller.get(seller.id) ?? 0 })),
+    couriers,
+  };
 }
 
 export async function resetMarketplaceData() {
