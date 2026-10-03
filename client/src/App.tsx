@@ -14,9 +14,10 @@ import Courier from "./pages/Courier";
 import Login from "./pages/Login";
 import Seller from "./pages/Seller";
 import BuyerProfile from "./pages/BuyerProfile";
+import AdminUserDetail from "./pages/AdminUserDetail";
 
 function Router() {
-  return <Switch><Route path="/" component={Home} /><Route path="/masuk" component={Login} /><Route path="/profil" component={BuyerProfile} /><Route path="/penjual" component={Seller} /><Route path="/produk/:id" component={ProductDetail} /><Route path="/pesanan/:id" component={OrderSummary} /><Route path="/admin" component={Admin} /><Route path="/kurir" component={Courier} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
+  return <Switch><Route path="/" component={Home} /><Route path="/masuk" component={Login} /><Route path="/profil" component={BuyerProfile} /><Route path="/penjual" component={Seller} /><Route path="/produk/:id" component={ProductDetail} /><Route path="/pesanan/:id" component={OrderSummary} /><Route path="/admin" component={Admin} /><Route path="/admin/user/:role/:id" component={AdminUserDetail} /><Route path="/kurir" component={Courier} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
 }
 
 function App() {

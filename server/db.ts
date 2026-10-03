@@ -114,6 +114,21 @@ export async function resetMarketplaceData() {
   return { success: true as const };
 }
 
+export async function getAdminUserDetail(role: "buyer" | "seller", id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  if (role === "buyer") {
+    const profileRows = await db.select().from(buyerProfiles).where(eq(buyerProfiles.id, id)).limit(1);
+    if (!profileRows[0]) return null;
+    const orderRows = await db.select().from(orders).where(eq(orders.whatsapp, profileRows[0].whatsapp)).orderBy(desc(orders.createdAt));
+    return { role, profile: profileRows[0], orders: orderRows };
+  }
+  const profileRows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.id, id)).limit(1);
+  if (!profileRows[0]) return null;
+  const productRows = await db.select().from(products).where(eq(products.sellerId, id)).orderBy(desc(products.createdAt));
+  return { role, profile: profileRows[0], products: productRows };
+}
+
 export async function upsertAccountRole(whatsapp: string, role: "buyer" | "seller" | "courier" | "admin", displayName: string) {
   const db = await getDb(); if (!db) return null;
   const roleField = { buyer: "isBuyer", seller: "isSeller", courier: "isCourier", admin: "isAdmin" }[role];
