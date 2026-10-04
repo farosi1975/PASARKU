@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getAccountRoles, getAdminProfile, getAdminUserDetail, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerProducts, resetMarketplaceData, upsertAccountRole } from "./db";
+import { getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerProducts, resetMarketplaceData, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -131,16 +131,17 @@ export const appRouter = router({
       const whatsapp = normalizePhone(input.whatsapp); const challenge = sellerChallenges.get(whatsapp);
       if (!challenge || challenge.expiresAt < Date.now()) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP penjual belum benar atau sudah kedaluwarsa. Minta OTP baru." });
       if (challenge.otp !== input.otp) { const error = invalidOtp(challenge, "OTP penjual belum benar."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) sellerChallenges.delete(whatsapp); throw error; }
-      const db = await dbRequired(); await db.insert(sellerProfiles).values({ shopName: challenge.shopName, ownerName: challenge.ownerName, whatsapp, village: challenge.village, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { shopName: challenge.shopName, ownerName: challenge.ownerName, village: challenge.village, verifiedAt: new Date() } });
+      const db = await dbRequired(); await db.insert(sellerProfiles).values({ shopName: challenge.shopName, ownerName: challenge.ownerName, whatsapp, village: challenge.village, verificationStatus: "verified", verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { shopName: challenge.shopName, ownerName: challenge.ownerName, village: challenge.village, verificationStatus: "verified", verifiedAt: new Date() } });
       sellerChallenges.delete(whatsapp); const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); await upsertAccountRole(whatsapp, "seller", challenge.ownerName); return rows[0];
     }),
     registerSeller: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2) })).mutation(async ({ input }) => {
-      const db = await dbRequired();
-      await db.insert(sellerProfiles).values({ ...input, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { shopName: input.shopName, ownerName: input.ownerName, village: input.village, verifiedAt: new Date() } });
-      const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, input.whatsapp)).limit(1); return rows[0];
+      const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp);
+      await db.insert(sellerProfiles).values({ shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), whatsapp, village: input.village, verificationStatus: "pending", verifiedAt: null }).onDuplicateKeyUpdate({ set: { shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, verificationStatus: "pending", verifiedAt: null, updatedAt: new Date() } });
+      await upsertAccountRole(whatsapp, "seller", input.ownerName.trim());
+      const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),
     createProduct: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2), category: z.string().min(2), price: z.number().int().positive(), stock: z.number().int().nonnegative() })).mutation(async ({ input }) => {
-      const db = await dbRequired(); const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, input.whatsapp)).limit(1); if (!seller[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Profil penjual belum terverifikasi." });
+      const db = await dbRequired(); const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1); if (!seller[0] || seller[0].verificationStatus !== "verified") throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual masih menunggu verifikasi manual Admin." });
       const result = await db.insert(products).values({ sellerId: seller[0].id, name: input.name, category: input.category, price: input.price, stock: input.stock, vendor: seller[0].shopName, location: seller[0].village, status: "approved" });
       return { id: Number((result as any)[0]?.insertId ?? 0), status: "approved" as const };
     }),
@@ -155,37 +156,41 @@ export const appRouter = router({
       const whatsapp = normalizePhone(input.whatsapp); const challenge = courierChallenges.get(whatsapp);
       if (!challenge || challenge.expiresAt < Date.now()) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP kurir belum benar atau sudah kedaluwarsa. Minta OTP baru." });
       if (challenge.otp !== input.otp) { const error = invalidOtp(challenge, "OTP kurir belum benar."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) courierChallenges.delete(whatsapp); throw error; }
-      const db = await dbRequired(); await db.insert(courierProfiles).values({ name: challenge.name, whatsapp, vehicle: challenge.vehicle, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { name: challenge.name, vehicle: challenge.vehicle, verifiedAt: new Date() } });
+      const db = await dbRequired(); await db.insert(courierProfiles).values({ name: challenge.name, whatsapp, vehicle: challenge.vehicle, verificationStatus: "verified", verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { name: challenge.name, vehicle: challenge.vehicle, verificationStatus: "verified", verifiedAt: new Date() } });
       courierChallenges.delete(whatsapp); const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); await upsertAccountRole(whatsapp, "courier", challenge.name); return rows[0];
     }),
     registerCourier: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, vehicle: z.string().min(2) })).mutation(async ({ input }) => {
-      const db = await dbRequired(); await db.insert(courierProfiles).values({ ...input, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { name: input.name, vehicle: input.vehicle, verifiedAt: new Date() } });
-      const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, input.whatsapp)).limit(1); return rows[0];
+      const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp);
+      await db.insert(courierProfiles).values({ name: input.name.trim(), whatsapp, vehicle: input.vehicle, verificationStatus: "pending", verifiedAt: null }).onDuplicateKeyUpdate({ set: { name: input.name.trim(), vehicle: input.vehicle, verificationStatus: "pending", verifiedAt: null, updatedAt: new Date() } });
+      await upsertAccountRole(whatsapp, "courier", input.name.trim());
+      const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),
-    buyerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => getBuyerProfile(input.whatsapp)),
+    buyerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => getBuyerProfile(normalizePhone(input.whatsapp))),
     accountRoles: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => getAccountRoles(normalizePhone(input.whatsapp))),
     saveBuyerProfile: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().optional() })).mutation(async ({ input }) => {
-      const db = await dbRequired();
-      await db.insert(buyerProfiles).values(input).onDuplicateKeyUpdate({ set: { name: input.name, village: input.village, address: input.address ?? null } });
-      return getBuyerProfile(input.whatsapp);
+      const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp);
+      await db.insert(buyerProfiles).values({ ...input, whatsapp }).onDuplicateKeyUpdate({ set: { name: input.name, village: input.village, address: input.address ?? null, updatedAt: new Date() } });
+      await upsertAccountRole(whatsapp, "buyer", input.name.trim());
+      return getBuyerProfile(whatsapp);
     }),
     createOrder: publicProcedure.input(z.object({ customerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().min(3), note: z.string().optional(), subtotal: z.number().int().nonnegative(), delivery: z.number().int().nonnegative(), total: z.number().int().nonnegative(), payment: z.string().min(2), items: z.array(z.object({ productId: z.number().int().optional(), productName: z.string(), price: z.number().int(), quantity: z.number().int().positive() })).min(1) })).mutation(async ({ input }) => {
-      const db = await dbRequired(); const orderCode = `INV-${Date.now()}`; await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp: input.whatsapp, village: input.village, address: input.address }).onDuplicateKeyUpdate({ set: { name: input.customerName, village: input.village, address: input.address } }); const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp: input.whatsapp, village: input.village, address: input.address, note: input.note, subtotal: input.subtotal, delivery: input.delivery, total: input.total, payment: input.payment, status: "Menunggu" }); const orderId = Number((result as any)[0]?.insertId ?? 0); await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity }))); return getOrderWithItems(orderCode);
+      const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const orderCode = `INV-${Date.now()}`; await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp, village: input.village, address: input.address }).onDuplicateKeyUpdate({ set: { name: input.customerName, village: input.village, address: input.address, updatedAt: new Date() } }); await upsertAccountRole(whatsapp, "buyer", input.customerName.trim()); const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, note: input.note, subtotal: input.subtotal, delivery: input.delivery, total: input.total, payment: input.payment, status: "Menunggu" }); const orderId = Number((result as any)[0]?.insertId ?? 0); await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity }))); return getOrderWithItems(orderCode);
     }),
     orders: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listOrders(); }),
     dashboardStats: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getDashboardStats(); }),
-    userDirectory: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getAdminUserDirectory(); }),
-    userDetail: publicProcedure.input(z.object({ sessionToken: adminSessionToken, role: z.enum(["buyer", "seller"]), id: z.number().int().positive() })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getAdminUserDetail(input.role, input.id); }),
-    resetMarketplaceData: publicProcedure.input(z.object({ sessionToken: adminSessionToken, confirmation: z.literal("HAPUS_DATA_NON_ADMIN") })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return resetMarketplaceData(); }),
     couriers: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listCouriers(); }),
+    userDirectory: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getAdminUserDirectory(); }),
+    resetNonAdminData: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return resetMarketplaceData(); }),
+    approveSeller: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), status: z.enum(["verified", "rejected"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.id, input.id)).limit(1); if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Pendaftaran penjual tidak ditemukan." }); await db.update(sellerProfiles).set({ verificationStatus: input.status, verifiedAt: input.status === "verified" ? new Date() : null }).where(eq(sellerProfiles.id, input.id)); return { success: true as const }; }),
+    approveCourier: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), status: z.enum(["verified", "rejected"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.id, input.id)).limit(1); if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Pendaftaran kurir tidak ditemukan." }); await db.update(courierProfiles).set({ verificationStatus: input.status, verifiedAt: input.status === "verified" ? new Date() : null }).where(eq(courierProfiles.id, input.id)); return { success: true as const }; }),
     courierProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
       const db = await dbRequired();
-      const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, input.whatsapp)).limit(1);
-      return rows[0] ?? null;
+      const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      return rows[0]?.verificationStatus === "verified" ? rows[0] : null;
     }),
     order: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).query(({ input }) => getOrderWithItems(input.orderCode)),
     assignCourier: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), whatsapp: phone })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, input.whatsapp)).limit(1); if (!courier[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Kurir belum terverifikasi." }); await db.update(orders).set({ courierId: courier[0].id, status: "Diproses" }).where(eq(orders.orderCode, input.orderCode)); return { success: true, courier: courier[0] }; }),
-    courierOrders: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => { const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, input.whatsapp)).limit(1); return courier[0] ? listCourierOrders(courier[0].id) : []; }),
+    courierOrders: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => { const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1); return courier[0]?.verificationStatus === "verified" ? listCourierOrders(courier[0].id) : []; }),
     updateOrderStatus: publicProcedure.input(z.object({ orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { const db = await dbRequired(); await db.update(orders).set({ status: input.status }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
     updateAdminOrderStatus: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); await db.update(orders).set({ status: input.status }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
     confirmDelivery: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).mutation(async ({ input }) => { const db = await dbRequired(); await db.update(orders).set({ status: "Selesai" }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),

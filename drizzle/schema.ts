@@ -18,7 +18,8 @@ export const sellerProfiles = mysqlTable("seller_profiles", {
   ownerName: varchar("ownerName", { length: 160 }).notNull(),
   whatsapp: varchar("whatsapp", { length: 32 }).notNull().unique(),
   village: varchar("village", { length: 80 }).notNull(),
-  verifiedAt: timestamp("verifiedAt").notNull(),
+  verificationStatus: mysqlEnum("verificationStatus", ["pending", "verified", "rejected"]).default("pending").notNull(),
+  verifiedAt: timestamp("verifiedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -28,7 +29,8 @@ export const courierProfiles = mysqlTable("courier_profiles", {
   name: varchar("name", { length: 160 }).notNull(),
   whatsapp: varchar("whatsapp", { length: 32 }).notNull().unique(),
   vehicle: varchar("vehicle", { length: 40 }).notNull(),
-  verifiedAt: timestamp("verifiedAt").notNull(),
+  verificationStatus: mysqlEnum("verificationStatus", ["pending", "verified", "rejected"]).default("pending").notNull(),
+  verifiedAt: timestamp("verifiedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

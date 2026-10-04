@@ -67,68 +67,6 @@ export async function listAdminProfiles() {
   return db.select().from(adminProfiles).orderBy(desc(adminProfiles.createdAt));
 }
 
-export async function getAdminUserDirectory() {
-  const db = await getDb();
-  if (!db) return { buyers: [], sellers: [], couriers: [] };
-  const [buyers, sellers, couriers, orderRows, productRows] = await Promise.all([
-    db.select().from(buyerProfiles).orderBy(desc(buyerProfiles.updatedAt)),
-    db.select().from(sellerProfiles).orderBy(desc(sellerProfiles.updatedAt)),
-    db.select().from(courierProfiles).orderBy(desc(courierProfiles.updatedAt)),
-    db.select({ whatsapp: orders.whatsapp, orderCode: orders.orderCode, createdAt: orders.createdAt }).from(orders),
-    db.select({ sellerId: products.sellerId }).from(products),
-  ]);
-  const ordersByBuyer = new Map<string, { count: number; lastOrderCode?: string; lastOrderAt?: Date }>();
-  for (const order of orderRows) {
-    const current = ordersByBuyer.get(order.whatsapp) ?? { count: 0 };
-    current.count += 1;
-    if (!current.lastOrderAt || order.createdAt > current.lastOrderAt) {
-      current.lastOrderCode = order.orderCode;
-      current.lastOrderAt = order.createdAt;
-    }
-    ordersByBuyer.set(order.whatsapp, current);
-  }
-  const productsBySeller = new Map<number, number>();
-  for (const product of productRows) {
-    if (product.sellerId !== null) productsBySeller.set(product.sellerId, (productsBySeller.get(product.sellerId) ?? 0) + 1);
-  }
-  return {
-    buyers: buyers.map((buyer) => ({ ...buyer, orderCount: ordersByBuyer.get(buyer.whatsapp)?.count ?? 0, lastOrderCode: ordersByBuyer.get(buyer.whatsapp)?.lastOrderCode ?? null, lastOrderAt: ordersByBuyer.get(buyer.whatsapp)?.lastOrderAt ?? null })),
-    sellers: sellers.map((seller) => ({ ...seller, productCount: productsBySeller.get(seller.id) ?? 0 })),
-    couriers,
-  };
-}
-
-export async function resetMarketplaceData() {
-  const db = await getDb();
-  if (!db) throw new Error("Database belum tersedia.");
-  await db.transaction(async (tx) => {
-    await tx.delete(orderItems);
-    await tx.delete(orders);
-    await tx.delete(products);
-    await tx.delete(buyerProfiles);
-    await tx.delete(sellerProfiles);
-    await tx.delete(courierProfiles);
-    await tx.update(userAccounts).set({ isBuyer: 0, isSeller: 0, isCourier: 0 }).where(eq(userAccounts.isAdmin, 1));
-    await tx.delete(userAccounts).where(eq(userAccounts.isAdmin, 0));
-  });
-  return { success: true as const };
-}
-
-export async function getAdminUserDetail(role: "buyer" | "seller", id: number) {
-  const db = await getDb();
-  if (!db) return null;
-  if (role === "buyer") {
-    const profileRows = await db.select().from(buyerProfiles).where(eq(buyerProfiles.id, id)).limit(1);
-    if (!profileRows[0]) return null;
-    const orderRows = await db.select().from(orders).where(eq(orders.whatsapp, profileRows[0].whatsapp)).orderBy(desc(orders.createdAt));
-    return { role, profile: profileRows[0], orders: orderRows };
-  }
-  const profileRows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.id, id)).limit(1);
-  if (!profileRows[0]) return null;
-  const productRows = await db.select().from(products).where(eq(products.sellerId, id)).orderBy(desc(products.createdAt));
-  return { role, profile: profileRows[0], products: productRows };
-}
-
 export async function upsertAccountRole(whatsapp: string, role: "buyer" | "seller" | "courier" | "admin", displayName: string) {
   const db = await getDb(); if (!db) return null;
   const roleField = { buyer: "isBuyer", seller: "isSeller", courier: "isCourier", admin: "isAdmin" }[role];
@@ -163,7 +101,51 @@ export async function listCourierOrders(courierId: number) {
 
 export async function listCouriers() {
   const db = await getDb(); if (!db) return [];
-  return db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle }).from(courierProfiles).orderBy(courierProfiles.name);
+  return db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle }).from(courierProfiles).where(eq(courierProfiles.verificationStatus, "verified")).orderBy(courierProfiles.name);
+}
+
+export async function getAdminUserDirectory() {
+  const db = await getDb();
+  if (!db) return { buyers: [], sellers: [], couriers: [], pendingSellers: [], pendingCouriers: [] };
+  const [buyers, sellers, couriers, orderRows, productRows] = await Promise.all([
+    db.select().from(buyerProfiles).orderBy(desc(buyerProfiles.updatedAt)),
+    db.select().from(sellerProfiles).orderBy(desc(sellerProfiles.updatedAt)),
+    db.select().from(courierProfiles).orderBy(desc(courierProfiles.updatedAt)),
+    db.select({ whatsapp: orders.whatsapp, orderCode: orders.orderCode, createdAt: orders.createdAt }).from(orders),
+    db.select({ sellerId: products.sellerId }).from(products),
+  ]);
+  const orderCounts = new Map<string, { count: number; lastOrderCode: string | null }>();
+  for (const order of orderRows) {
+    const current = orderCounts.get(order.whatsapp) ?? { count: 0, lastOrderCode: null };
+    current.count += 1;
+    current.lastOrderCode = order.orderCode;
+    orderCounts.set(order.whatsapp, current);
+  }
+  const productCounts = new Map<number, number>();
+  for (const product of productRows) if (product.sellerId !== null) productCounts.set(product.sellerId, (productCounts.get(product.sellerId) ?? 0) + 1);
+  return {
+    buyers: buyers.map((buyer) => ({ ...buyer, orderCount: orderCounts.get(buyer.whatsapp)?.count ?? 0, lastOrderCode: orderCounts.get(buyer.whatsapp)?.lastOrderCode ?? null })),
+    sellers: sellers.map((seller) => ({ ...seller, productCount: productCounts.get(seller.id) ?? 0 })),
+    couriers: couriers.filter((courier) => courier.verificationStatus === "verified"),
+    pendingSellers: sellers.filter((seller) => seller.verificationStatus === "pending"),
+    pendingCouriers: couriers.filter((courier) => courier.verificationStatus === "pending"),
+  };
+}
+
+export async function resetMarketplaceData() {
+  const db = await getDb();
+  if (!db) throw new Error("Database belum tersedia.");
+  await db.transaction(async (tx) => {
+    await tx.delete(orderItems);
+    await tx.delete(orders);
+    await tx.delete(products);
+    await tx.delete(buyerProfiles);
+    await tx.delete(sellerProfiles);
+    await tx.delete(courierProfiles);
+    await tx.update(userAccounts).set({ isBuyer: 0, isSeller: 0, isCourier: 0 }).where(eq(userAccounts.isAdmin, 1));
+    await tx.delete(userAccounts).where(eq(userAccounts.isAdmin, 0));
+  });
+  return { success: true as const };
 }
 
 export async function getDashboardStats() {
@@ -171,13 +153,13 @@ export async function getDashboardStats() {
   if (!db) return { activeOrders: 0, registeredStores: 0, readyCouriers: 0, revenue: 0 };
   const [orderRows, storeRows, courierRows] = await Promise.all([
     db.select({ status: orders.status, total: orders.total }).from(orders),
-    db.select({ id: sellerProfiles.id }).from(sellerProfiles),
-    db.select({ id: courierProfiles.id }).from(courierProfiles),
+    db.select({ id: sellerProfiles.id, verificationStatus: sellerProfiles.verificationStatus }).from(sellerProfiles),
+    db.select({ id: courierProfiles.id, verificationStatus: courierProfiles.verificationStatus }).from(courierProfiles),
   ]);
   return {
     activeOrders: orderRows.filter((order) => order.status !== "Selesai" && order.status !== "Dibatalkan").length,
-    registeredStores: storeRows.length,
-    readyCouriers: courierRows.length,
+    registeredStores: storeRows.filter((store) => store.verificationStatus === "verified").length,
+    readyCouriers: courierRows.filter((courier) => courier.verificationStatus === "verified").length,
     revenue: orderRows.reduce((sum, order) => sum + order.total, 0),
   };
 }
