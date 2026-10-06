@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { ENV } from "./_core/env";
 import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, userAccounts, users } from "../drizzle/schema";
@@ -101,7 +101,7 @@ export async function listCourierOrders(courierId: number) {
 
 export async function listCouriers() {
   const db = await getDb(); if (!db) return [];
-  return db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle }).from(courierProfiles).where(eq(courierProfiles.verificationStatus, "verified")).orderBy(courierProfiles.name);
+  return db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned }).from(courierProfiles).where(and(eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).orderBy(courierProfiles.name);
 }
 
 export async function getAdminUserDirectory() {
@@ -126,7 +126,7 @@ export async function getAdminUserDirectory() {
   return {
     buyers: buyers.map((buyer) => ({ ...buyer, orderCount: orderCounts.get(buyer.whatsapp)?.count ?? 0, lastOrderCode: orderCounts.get(buyer.whatsapp)?.lastOrderCode ?? null })),
     sellers: sellers.map((seller) => ({ ...seller, productCount: productCounts.get(seller.id) ?? 0 })),
-    couriers: couriers.filter((courier) => courier.verificationStatus === "verified"),
+    couriers,
     pendingSellers: sellers.filter((seller) => seller.verificationStatus === "pending"),
     pendingCouriers: couriers.filter((courier) => courier.verificationStatus === "pending"),
   };
@@ -153,13 +153,13 @@ export async function getDashboardStats() {
   if (!db) return { activeOrders: 0, registeredStores: 0, readyCouriers: 0, revenue: 0 };
   const [orderRows, storeRows, courierRows] = await Promise.all([
     db.select({ status: orders.status, total: orders.total }).from(orders),
-    db.select({ id: sellerProfiles.id, verificationStatus: sellerProfiles.verificationStatus }).from(sellerProfiles),
-    db.select({ id: courierProfiles.id, verificationStatus: courierProfiles.verificationStatus }).from(courierProfiles),
+    db.select({ id: sellerProfiles.id, verificationStatus: sellerProfiles.verificationStatus, isBanned: sellerProfiles.isBanned }).from(sellerProfiles),
+    db.select({ id: courierProfiles.id, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned }).from(courierProfiles),
   ]);
   return {
     activeOrders: orderRows.filter((order) => order.status !== "Selesai" && order.status !== "Dibatalkan").length,
-    registeredStores: storeRows.filter((store) => store.verificationStatus === "verified").length,
-    readyCouriers: courierRows.filter((courier) => courier.verificationStatus === "verified").length,
+    registeredStores: storeRows.filter((store) => store.verificationStatus === "verified" && !store.isBanned).length,
+    readyCouriers: courierRows.filter((courier) => courier.verificationStatus === "verified" && !courier.isBanned).length,
     revenue: orderRows.reduce((sum, order) => sum + order.total, 0),
   };
 }
