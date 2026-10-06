@@ -1,106 +1,112 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { integer, pgEnum, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
+export const verificationStatusEnum = pgEnum("verification_status", ["pending", "verified", "rejected", "unverified"]);
+export const buyerVerificationStatusEnum = pgEnum("buyer_verification_status", ["pending", "verified", "unverified"]);
+export const productStatusEnum = pgEnum("product_status", ["draft", "approved", "archived"]);
+export const orderStatusEnum = pgEnum("order_status", ["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]);
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: userRoleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
-export const sellerProfiles = mysqlTable("seller_profiles", {
-  id: int("id").autoincrement().primaryKey(),
+export const sellerProfiles = pgTable("seller_profiles", {
+  id: serial("id").primaryKey(),
   shopName: varchar("shopName", { length: 160 }).notNull(),
   ownerName: varchar("ownerName", { length: 160 }).notNull(),
   whatsapp: varchar("whatsapp", { length: 32 }).notNull().unique(),
   village: varchar("village", { length: 80 }).notNull(),
-  preferredCourierId: int("preferredCourierId"),
-  isOpen: int("isOpen").default(1).notNull(),
-  freeShipping: int("freeShipping").default(0).notNull(),
-  verificationStatus: mysqlEnum("verificationStatus", ["pending", "verified", "rejected", "unverified"]).default("pending").notNull(),
-  isBanned: int("isBanned").default(0).notNull(),
+  preferredCourierId: integer("preferredCourierId"),
+  isOpen: integer("isOpen").default(1).notNull(),
+  freeShipping: integer("freeShipping").default(0).notNull(),
+  verificationStatus: verificationStatusEnum("verificationStatus").default("pending").notNull(),
+  isBanned: integer("isBanned").default(0).notNull(),
   verifiedAt: timestamp("verifiedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-export const courierProfiles = mysqlTable("courier_profiles", {
-  id: int("id").autoincrement().primaryKey(),
+export const courierProfiles = pgTable("courier_profiles", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 160 }).notNull(),
   whatsapp: varchar("whatsapp", { length: 32 }).notNull().unique(),
   vehicle: varchar("vehicle", { length: 40 }).notNull(),
   village: varchar("village", { length: 80 }).default("Sawahan").notNull(),
   address: text("address"),
-  verificationStatus: mysqlEnum("verificationStatus", ["pending", "verified", "rejected", "unverified"]).default("pending").notNull(),
-  isBanned: int("isBanned").default(0).notNull(),
+  verificationStatus: verificationStatusEnum("verificationStatus").default("pending").notNull(),
+  isBanned: integer("isBanned").default(0).notNull(),
   verifiedAt: timestamp("verifiedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-export const buyerProfiles = mysqlTable("buyer_profiles", {
-  id: int("id").autoincrement().primaryKey(),
+export const buyerProfiles = pgTable("buyer_profiles", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 160 }).notNull(),
   whatsapp: varchar("whatsapp", { length: 32 }).notNull().unique(),
   village: varchar("village", { length: 80 }).notNull(),
   address: text("address"),
-  verificationStatus: mysqlEnum("verificationStatus", ["pending", "verified", "unverified"]).default("verified").notNull(),
-  isBanned: int("isBanned").default(0).notNull(),
+  verificationStatus: buyerVerificationStatusEnum("verificationStatus").default("verified").notNull(),
+  isBanned: integer("isBanned").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-export const shippingSettings = mysqlTable("shipping_settings", {
-  id: int("id").autoincrement().primaryKey(),
-  ratePerKm: int("ratePerKm").default(3000).notNull(),
-  discountPercent: int("discountPercent").default(0).notNull(),
+export const shippingSettings = pgTable("shipping_settings", {
+  id: serial("id").primaryKey(),
+  ratePerKm: integer("ratePerKm").default(3000).notNull(),
+  discountPercent: integer("discountPercent").default(0).notNull(),
   originLatitude: varchar("originLatitude", { length: 32 }).default("-7.602345").notNull(),
   originLongitude: varchar("originLongitude", { length: 32 }).default("111.904321").notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-export const adminProfiles = mysqlTable("admin_profiles", {
-  id: int("id").autoincrement().primaryKey(),
+export const adminProfiles = pgTable("admin_profiles", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 160 }).notNull(),
   whatsapp: varchar("whatsapp", { length: 32 }).notNull().unique(),
   verifiedAt: timestamp("verifiedAt").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-export const userAccounts = mysqlTable("user_accounts", {
-  id: int("id").autoincrement().primaryKey(),
+export const userAccounts = pgTable("user_accounts", {
+  id: serial("id").primaryKey(),
   whatsapp: varchar("whatsapp", { length: 32 }).notNull().unique(),
   displayName: varchar("displayName", { length: 160 }).notNull(),
-  isBuyer: int("isBuyer").default(0).notNull(),
-  isSeller: int("isSeller").default(0).notNull(),
-  isCourier: int("isCourier").default(0).notNull(),
-  isAdmin: int("isAdmin").default(0).notNull(),
+  isBuyer: integer("isBuyer").default(0).notNull(),
+  isSeller: integer("isSeller").default(0).notNull(),
+  isCourier: integer("isCourier").default(0).notNull(),
+  isAdmin: integer("isAdmin").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-export const products = mysqlTable("products", {
-  id: int("id").autoincrement().primaryKey(),
-  sellerId: int("sellerId"),
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  sellerId: integer("sellerId"),
   name: varchar("name", { length: 180 }).notNull(),
   category: varchar("category", { length: 80 }).notNull(),
-  price: int("price").notNull(),
-  stock: int("stock").default(0).notNull(),
+  price: integer("price").notNull(),
+  stock: integer("stock").default(0).notNull(),
   imageUrl: text("imageUrl"),
   vendor: varchar("vendor", { length: 160 }).notNull(),
   location: varchar("location", { length: 100 }).notNull(),
-  status: mysqlEnum("status", ["draft", "approved", "archived"]).default("draft").notNull(),
+  status: productStatusEnum("status").default("draft").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-export const orders = mysqlTable("orders", {
-  id: int("id").autoincrement().primaryKey(),
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
   orderCode: varchar("orderCode", { length: 32 }).notNull().unique(),
   customerName: varchar("customerName", { length: 160 }).notNull(),
   whatsapp: varchar("whatsapp", { length: 32 }).notNull(),
@@ -108,24 +114,24 @@ export const orders = mysqlTable("orders", {
   address: text("address").notNull(),
   currentLocation: text("currentLocation"),
   note: text("note"),
-  subtotal: int("subtotal").notNull(),
-  delivery: int("delivery").notNull(),
-  total: int("total").notNull(),
+  subtotal: integer("subtotal").notNull(),
+  delivery: integer("delivery").notNull(),
+  total: integer("total").notNull(),
   payment: varchar("payment", { length: 30 }).notNull(),
-  status: mysqlEnum("status", ["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]).default("Menunggu").notNull(),
-  courierId: int("courierId"),
+  status: orderStatusEnum("status").default("Menunggu").notNull(),
+  courierId: integer("courierId"),
   courierAcceptedAt: timestamp("courierAcceptedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-export const orderItems = mysqlTable("order_items", {
-  id: int("id").autoincrement().primaryKey(),
-  orderId: int("orderId").notNull(),
-  productId: int("productId"),
+export const orderItems = pgTable("order_items", {
+  id: serial("id").primaryKey(),
+  orderId: integer("orderId").notNull(),
+  productId: integer("productId"),
   productName: varchar("productName", { length: 180 }).notNull(),
-  price: int("price").notNull(),
-  quantity: int("quantity").notNull(),
+  price: integer("price").notNull(),
+  quantity: integer("quantity").notNull(),
 });
 
 export type User = typeof users.$inferSelect;

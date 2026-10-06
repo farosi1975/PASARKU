@@ -151,7 +151,7 @@ export const appRouter = router({
       await requireAdminSession(input.sessionToken);
       const db = await dbRequired();
       const whatsapp = normalizePhone(input.whatsapp);
-      await db.insert(adminProfiles).values({ name: input.name.trim(), whatsapp, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { name: input.name.trim(), verifiedAt: new Date() } });
+      await db.insert(adminProfiles).values({ name: input.name.trim(), whatsapp, verifiedAt: new Date() }).onConflictDoUpdate({ target: adminProfiles.whatsapp, set: { name: input.name.trim(), verifiedAt: new Date() } });
       return getAdminProfile(whatsapp);
     }),
     sellerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
@@ -205,12 +205,12 @@ export const appRouter = router({
       const whatsapp = normalizePhone(input.whatsapp); const challenge = sellerChallenges.get(whatsapp);
       if (!challenge || challenge.expiresAt < Date.now()) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP penjual belum benar atau sudah kedaluwarsa. Minta OTP baru." });
       if (challenge.otp !== input.otp) { const error = invalidOtp(challenge, "OTP penjual belum benar."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) sellerChallenges.delete(whatsapp); throw error; }
-      const db = await dbRequired(); await db.insert(sellerProfiles).values({ shopName: challenge.shopName, ownerName: challenge.ownerName, whatsapp, village: challenge.village, verificationStatus: "verified", verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { shopName: challenge.shopName, ownerName: challenge.ownerName, village: challenge.village, verificationStatus: "verified", verifiedAt: new Date() } });
+      const db = await dbRequired(); await db.insert(sellerProfiles).values({ shopName: challenge.shopName, ownerName: challenge.ownerName, whatsapp, village: challenge.village, verificationStatus: "verified", verifiedAt: new Date() }).onConflictDoUpdate({ target: sellerProfiles.whatsapp, set: { shopName: challenge.shopName, ownerName: challenge.ownerName, village: challenge.village, verificationStatus: "verified", verifiedAt: new Date() } });
       sellerChallenges.delete(whatsapp); const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); await upsertAccountRole(whatsapp, "seller", challenge.ownerName); return rows[0];
     }),
     registerSeller: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2) })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existing = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); if (existing[0]?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun toko ini diblokir oleh Admin PASARKU." });
-      await db.insert(sellerProfiles).values({ shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), whatsapp, village: input.village, verificationStatus: "pending", verifiedAt: null }).onDuplicateKeyUpdate({ set: { shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, verificationStatus: "pending", verifiedAt: null, updatedAt: new Date() } });
+      await db.insert(sellerProfiles).values({ shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), whatsapp, village: input.village, verificationStatus: "pending", verifiedAt: null }).onConflictDoUpdate({ target: sellerProfiles.whatsapp, set: { shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, verificationStatus: "pending", verifiedAt: null, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "seller", input.ownerName.trim());
       const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),
@@ -251,12 +251,12 @@ export const appRouter = router({
       const whatsapp = normalizePhone(input.whatsapp); const challenge = courierChallenges.get(whatsapp);
       if (!challenge || challenge.expiresAt < Date.now()) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP kurir belum benar atau sudah kedaluwarsa. Minta OTP baru." });
       if (challenge.otp !== input.otp) { const error = invalidOtp(challenge, "OTP kurir belum benar."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) courierChallenges.delete(whatsapp); throw error; }
-      const db = await dbRequired(); await db.insert(courierProfiles).values({ name: challenge.name, whatsapp, vehicle: challenge.vehicle, verificationStatus: "verified", verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { name: challenge.name, vehicle: challenge.vehicle, verificationStatus: "verified", verifiedAt: new Date() } });
+      const db = await dbRequired(); await db.insert(courierProfiles).values({ name: challenge.name, whatsapp, vehicle: challenge.vehicle, verificationStatus: "verified", verifiedAt: new Date() }).onConflictDoUpdate({ target: courierProfiles.whatsapp, set: { name: challenge.name, vehicle: challenge.vehicle, verificationStatus: "verified", verifiedAt: new Date() } });
       courierChallenges.delete(whatsapp); const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); await upsertAccountRole(whatsapp, "courier", challenge.name); return rows[0];
     }),
     registerCourier: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, vehicle: z.string().min(2), village: z.string().min(2).default("Sawahan"), address: z.string().optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existing = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); if (existing[0]?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun kurir ini diblokir oleh Admin PASARKU." });
-      await db.insert(courierProfiles).values({ name: input.name.trim(), whatsapp, vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, verificationStatus: "pending", verifiedAt: null }).onDuplicateKeyUpdate({ set: { name: input.name.trim(), vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, verificationStatus: "pending", verifiedAt: null, updatedAt: new Date() } });
+      await db.insert(courierProfiles).values({ name: input.name.trim(), whatsapp, vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, verificationStatus: "pending", verifiedAt: null }).onConflictDoUpdate({ target: courierProfiles.whatsapp, set: { name: input.name.trim(), vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, verificationStatus: "pending", verifiedAt: null, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "courier", input.name.trim());
       const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),
@@ -264,7 +264,7 @@ export const appRouter = router({
     accountRoles: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => getAccountRoles(normalizePhone(input.whatsapp))),
     saveBuyerProfile: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existing = await getBuyerProfile(whatsapp); if (existing?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli diblokir oleh Admin PASARKU." });
-      await db.insert(buyerProfiles).values({ ...input, whatsapp }).onDuplicateKeyUpdate({ set: { name: input.name, village: input.village, address: input.address ?? null, updatedAt: new Date() } });
+      await db.insert(buyerProfiles).values({ ...input, whatsapp }).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: input.name, village: input.village, address: input.address ?? null, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.name.trim());
       return getBuyerProfile(whatsapp);
     }),
@@ -279,7 +279,7 @@ export const appRouter = router({
       const freeShipping = productRowsForShipping.length === input.items.length && productRowsForShipping.every((rows) => rows[0]?.freeShipping === 1);
       const calculatedDelivery = calculateShippingCost(shipping, input.currentLocation, freeShipping, input.routeDistanceKm);
       const calculatedTotal = input.subtotal + calculatedDelivery;
-      await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp, village: input.village, address: input.address }).onDuplicateKeyUpdate({ set: { name: input.customerName, village: input.village, address: input.address, updatedAt: new Date() } });
+      await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp, village: input.village, address: input.address }).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: input.customerName, village: input.village, address: input.address, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.customerName.trim());
       const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, currentLocation: input.currentLocation || null, note: input.note, subtotal: input.subtotal, delivery: calculatedDelivery, total: calculatedTotal, payment: input.payment, status: "Menunggu" });
       const orderId = Number((result as any)[0]?.insertId ?? 0);

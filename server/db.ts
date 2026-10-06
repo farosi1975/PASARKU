@@ -1,13 +1,15 @@
 import { and, desc, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { ENV } from "./_core/env";
 import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, userAccounts, users } from "../drizzle/schema";
 
+let _pool: Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
-    try { _db = drizzle(process.env.DATABASE_URL); } catch (error) { console.warn("[Database] Failed to connect:", error); _db = null; }
+    try { _pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined }); _db = drizzle(_pool); } catch (error) { console.warn("[Database] Failed to connect:", error); _pool = null; _db = null; }
   }
   return _db;
 }
@@ -24,7 +26,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; } else if (user.openId === ENV.ownerOpenId) { values.role = "admin"; updateSet.role = "admin"; }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (!Object.keys(updateSet).length) updateSet.lastSignedIn = new Date();
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -57,7 +59,7 @@ export async function getShippingSettings() {
 export async function saveShippingSettings(input: { ratePerKm: number; discountPercent: number; originLatitude: string; originLongitude: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database belum tersedia.");
-  await db.insert(shippingSettings).values({ id: 1, ...input }).onDuplicateKeyUpdate({ set: { ...input, updatedAt: new Date() } });
+  await db.insert(shippingSettings).values({ id: 1, ...input }).onConflictDoUpdate({ target: shippingSettings.id, set: { ...input, updatedAt: new Date() } });
   return getShippingSettings();
 }
 
@@ -86,7 +88,7 @@ export async function listAdminProfiles() {
 export async function upsertAccountRole(whatsapp: string, role: "buyer" | "seller" | "courier" | "admin", displayName: string) {
   const db = await getDb(); if (!db) return null;
   const roleField = { buyer: "isBuyer", seller: "isSeller", courier: "isCourier", admin: "isAdmin" }[role];
-  await db.insert(userAccounts).values({ whatsapp, displayName, [roleField]: 1 }).onDuplicateKeyUpdate({ set: { displayName, [roleField]: 1, updatedAt: new Date() } });
+  await db.insert(userAccounts).values({ whatsapp, displayName, [roleField]: 1 }).onConflictDoUpdate({ target: userAccounts.whatsapp, set: { displayName, [roleField]: 1, updatedAt: new Date() } });
   const rows = await db.select().from(userAccounts).where(eq(userAccounts.whatsapp, whatsapp)).limit(1);
   return rows[0] ?? null;
 }
