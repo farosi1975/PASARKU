@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { ENV } from "./_core/env";
-import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, userAccounts, users } from "../drizzle/schema";
+import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, userAccounts, users } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -35,8 +35,8 @@ export async function getUserByOpenId(openId: string) {
 
 export async function listApprovedProducts() {
   const db = await getDb(); if (!db) return [];
-  const rows = await db.select({ product: products }).from(products).innerJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(and(eq(products.status, "approved"), eq(sellerProfiles.verificationStatus, "verified"), eq(sellerProfiles.isBanned, 0), eq(sellerProfiles.isOpen, 1))).orderBy(desc(products.createdAt));
-  return rows.map((row) => row.product);
+  const rows = await db.select({ product: products, sellerFreeShipping: sellerProfiles.freeShipping }).from(products).innerJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(and(eq(products.status, "approved"), eq(sellerProfiles.verificationStatus, "verified"), eq(sellerProfiles.isBanned, 0), eq(sellerProfiles.isOpen, 1))).orderBy(desc(products.createdAt));
+  return rows.map((row) => ({ ...row.product, sellerFreeShipping: Boolean(row.sellerFreeShipping) }));
 }
 
 export async function listSellerProducts(whatsapp: string) {
@@ -44,6 +44,21 @@ export async function listSellerProducts(whatsapp: string) {
   const sellers = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1);
   if (!sellers[0]) return [];
   return db.select().from(products).where(eq(products.sellerId, sellers[0].id)).orderBy(desc(products.createdAt));
+}
+
+export async function getShippingSettings() {
+  const db = await getDb();
+  if (!db) return { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321" };
+  const rows = await db.select().from(shippingSettings).where(eq(shippingSettings.id, 1)).limit(1);
+  const settings = rows[0];
+  return settings ? { ratePerKm: settings.ratePerKm, discountPercent: settings.discountPercent, originLatitude: settings.originLatitude, originLongitude: settings.originLongitude } : { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321" };
+}
+
+export async function saveShippingSettings(input: { ratePerKm: number; discountPercent: number; originLatitude: string; originLongitude: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database belum tersedia.");
+  await db.insert(shippingSettings).values({ id: 1, ...input }).onDuplicateKeyUpdate({ set: { ...input, updatedAt: new Date() } });
+  return getShippingSettings();
 }
 
 export async function getBuyerProfile(whatsapp: string) {

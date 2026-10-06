@@ -4,12 +4,13 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerProducts, resetMarketplaceData, upsertAccountRole } from "./db";
+import { getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerProducts, resetMarketplaceData, saveShippingSettings, getShippingSettings, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendFonnteMessage } from "./fonnte";
 import { storagePut } from "./storage";
+import { calculateShippingCost } from "../shared/shipping";
 
 const phone = z.string().min(10).max(32);
 const dbRequired = async () => { const db = await getDb(); if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database belum tersedia." }); return db; };
@@ -165,6 +166,15 @@ export const appRouter = router({
       await db.update(sellerProfiles).set({ isOpen: input.isOpen ? 1 : 0, updatedAt: new Date() }).where(eq(sellerProfiles.id, seller[0].id));
       return { isOpen: input.isOpen } as const;
     }),
+    setSellerFreeShipping: publicProcedure.input(z.object({ whatsapp: phone, freeShipping: z.boolean() })).mutation(async ({ input }) => {
+      const db = await dbRequired();
+      const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual belum terverifikasi." });
+      await db.update(sellerProfiles).set({ freeShipping: input.freeShipping ? 1 : 0, updatedAt: new Date() }).where(eq(sellerProfiles.id, seller[0].id));
+      return { freeShipping: input.freeShipping } as const;
+    }),
+    shippingSettings: publicProcedure.query(() => getShippingSettings()),
+
     sellerProducts: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => listSellerProducts(input.whatsapp)),
     sellerCouriers: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
       const db = await dbRequired();
@@ -262,9 +272,16 @@ export const appRouter = router({
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existingBuyer = await getBuyerProfile(whatsapp);
       if (existingBuyer?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli diblokir oleh Admin PASARKU." });
       const orderCode = `INV-${Date.now()}`;
+      const shipping = await getShippingSettings();
+      const productRowsForShipping = input.items.every((item) => item.productId !== undefined)
+        ? await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId, freeShipping: sellerProfiles.freeShipping }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(products.id, item.productId as number)).limit(1)))
+        : [];
+      const freeShipping = productRowsForShipping.length === input.items.length && productRowsForShipping.every((rows) => rows[0]?.freeShipping === 1);
+      const calculatedDelivery = calculateShippingCost(shipping, input.currentLocation, freeShipping);
+      const calculatedTotal = input.subtotal + calculatedDelivery;
       await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp, village: input.village, address: input.address }).onDuplicateKeyUpdate({ set: { name: input.customerName, village: input.village, address: input.address, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.customerName.trim());
-      const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, currentLocation: input.currentLocation || null, note: input.note, subtotal: input.subtotal, delivery: input.delivery, total: input.total, payment: input.payment, status: "Menunggu" });
+      const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, currentLocation: input.currentLocation || null, note: input.note, subtotal: input.subtotal, delivery: calculatedDelivery, total: calculatedTotal, payment: input.payment, status: "Menunggu" });
       const orderId = Number((result as any)[0]?.insertId ?? 0);
       await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity })));
       let assignedCourier: { whatsapp: string; name: string } | null = null;
@@ -284,11 +301,13 @@ export const appRouter = router({
           }
         }
       }
-      if (assignedCourier) void notifyCourierAssignment(assignedCourier.whatsapp, orderCode, input.total, "otomatis");
+      if (assignedCourier) void notifyCourierAssignment(assignedCourier.whatsapp, orderCode, calculatedTotal, "otomatis");
       return getOrderWithItems(orderCode);
     }),
     orders: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listOrders(); }),
     dashboardStats: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getDashboardStats(); }),
+    adminShippingSettings: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getShippingSettings(); }),
+    updateShippingSettings: publicProcedure.input(z.object({ sessionToken: adminSessionToken, ratePerKm: z.number().int().min(0).max(1000000), discountPercent: z.number().int().min(0).max(100), originLatitude: z.string().regex(/^-?\d+(?:\.\d+)?$/), originLongitude: z.string().regex(/^-?\d+(?:\.\d+)?$/) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const latitude = Number(input.originLatitude); const longitude = Number(input.originLongitude); if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) throw new TRPCError({ code: "BAD_REQUEST", message: "Koordinat titik pusat tidak valid." }); return saveShippingSettings({ ratePerKm: input.ratePerKm, discountPercent: input.discountPercent, originLatitude: input.originLatitude, originLongitude: input.originLongitude }); }),
     couriers: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listCouriers(); }),
     userDirectory: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getAdminUserDirectory(); }),
     resetNonAdminData: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return resetMarketplaceData(); }),

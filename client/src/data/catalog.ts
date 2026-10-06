@@ -13,6 +13,7 @@ export type Product = {
   imageUrl?: string | null;
   badge?: string;
   storeOpen?: boolean;
+  sellerFreeShipping?: boolean;
 };
 
 export type OrderStatus = "Menunggu" | "Diproses" | "Diantar" | "Selesai";

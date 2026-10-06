@@ -71,6 +71,13 @@
       "when": 1791281404648,
       "tag": "0009_nifty_moonstone",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1791292657014,
+      "tag": "0010_mighty_mandrill",
+      "breakpoints": true
     }
   ]
 }

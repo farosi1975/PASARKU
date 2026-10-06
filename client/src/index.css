@@ -952,3 +952,22 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 
 .maps-link { display: inline-flex; align-items: center; margin-left: 5px; color: #b85d3e; font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
 .maps-link:hover { color: #7f3f2c; }
+
+.shipping-settings-panel { display: grid; gap: 14px; margin-bottom: 22px; padding: 20px; border: 1px solid #eadbd2; border-radius: 16px; background: #fffdf9; box-shadow: 0 8px 24px rgba(113, 71, 54, .05); }
+.shipping-settings-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.shipping-settings-form label { display: grid; gap: 6px; color: #6f574c; font-size: 10px; font-weight: 800; }
+.shipping-settings-form input { min-height: 38px; border: 1px solid #eadbd2; border-radius: 8px; padding: 0 10px; color: #493b36; background: #fff; font-size: 11px; }
+.shipping-settings-form input:focus { outline: 2px solid rgba(236, 104, 69, .18); border-color: #e87856; }
+.shipping-settings-form small, .shipping-settings-note { color: #9a8176; font-size: 9px; font-weight: 500; line-height: 1.45; }
+.shipping-settings-form .primary-button { min-height: 38px; white-space: nowrap; }
+.shipping-settings-note { display: block; }
+.seller-free-shipping-toggle { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e8c8b9; border-radius: 999px; padding: 8px 12px; color: #9b654e; background: #fff8f3; font-size: 10px; font-weight: 800; cursor: pointer; }
+.seller-free-shipping-toggle.active { border-color: #b8dcc4; color: #267143; background: #f1fbf3; }
+.seller-free-shipping-toggle:disabled { opacity: .6; cursor: wait; }
+.seller-settings-action { margin-left: auto; border: 1px solid #e8c8b9; border-radius: 7px; padding: 7px 10px; color: #a85e42; background: #fff8f3; font-size: 9px; font-weight: 800; cursor: pointer; }
+.seller-settings-action:disabled { opacity: .6; cursor: wait; }
+.checkout-shipping-summary { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border: 1px solid #eadbd2; border-radius: 10px; background: #fffaf6; }
+.checkout-shipping-summary > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #8b746b; font-size: 10px; }
+.checkout-shipping-summary strong { color: #5b443b; font-size: 11px; }
+@media (max-width: 900px) { .shipping-settings-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .shipping-settings-form { grid-template-columns: 1fr; } .seller-free-shipping-toggle { width: 100%; justify-content: center; } }

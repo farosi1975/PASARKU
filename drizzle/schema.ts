@@ -20,6 +20,7 @@ export const sellerProfiles = mysqlTable("seller_profiles", {
   village: varchar("village", { length: 80 }).notNull(),
   preferredCourierId: int("preferredCourierId"),
   isOpen: int("isOpen").default(1).notNull(),
+  freeShipping: int("freeShipping").default(0).notNull(),
   verificationStatus: mysqlEnum("verificationStatus", ["pending", "verified", "rejected", "unverified"]).default("pending").notNull(),
   isBanned: int("isBanned").default(0).notNull(),
   verifiedAt: timestamp("verifiedAt"),
@@ -50,6 +51,15 @@ export const buyerProfiles = mysqlTable("buyer_profiles", {
   verificationStatus: mysqlEnum("verificationStatus", ["pending", "verified", "unverified"]).default("verified").notNull(),
   isBanned: int("isBanned").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const shippingSettings = mysqlTable("shipping_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  ratePerKm: int("ratePerKm").default(3000).notNull(),
+  discountPercent: int("discountPercent").default(0).notNull(),
+  originLatitude: varchar("originLatitude", { length: 32 }).default("-7.602345").notNull(),
+  originLongitude: varchar("originLongitude", { length: 32 }).default("111.904321").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
