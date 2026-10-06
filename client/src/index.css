@@ -949,3 +949,6 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 
 .customer-location, .task-current-location { color: #a85e42; font-weight: 700; }
 .task-current-location { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 10px; }
+
+.maps-link { display: inline-flex; align-items: center; margin-left: 5px; color: #b85d3e; font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
+.maps-link:hover { color: #7f3f2c; }
