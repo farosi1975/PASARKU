@@ -35,9 +35,9 @@ export function distanceInKm(from: string | null | undefined, to: ShippingSettin
   return Math.max(1, earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-export function calculateShippingCost(settings: ShippingSettings, currentLocation?: string | null, freeShipping = false) {
+export function calculateShippingCost(settings: ShippingSettings, currentLocation?: string | null, freeShipping = false, routeDistanceKm?: number | null) {
   if (freeShipping) return 0;
-  const distanceKm = distanceInKm(currentLocation, settings);
+  const distanceKm = routeDistanceKm && Number.isFinite(routeDistanceKm) && routeDistanceKm > 0 && routeDistanceKm <= 100 ? routeDistanceKm : distanceInKm(currentLocation, settings);
   const gross = Math.ceil(distanceKm * Math.max(0, settings.ratePerKm));
   const discount = Math.min(100, Math.max(0, settings.discountPercent));
   return Math.max(0, Math.round(gross * (1 - discount / 100)));

@@ -16,6 +16,7 @@ describe("shipping calculator", () => {
   it("applies the Admin percentage discount", () => {
     const settings = { ...DEFAULT_SHIPPING_SETTINGS, ratePerKm: 10000, discountPercent: 20 };
     expect(calculateShippingCost(settings, "-7.602345, 111.904321")).toBe(8000);
+    expect(calculateShippingCost(settings, "-7.602345, 111.904321", false, 2)).toBe(16000);
   });
 
   it("makes the delivery fee zero for a free-shipping shop", () => {
