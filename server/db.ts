@@ -104,6 +104,10 @@ export async function listCouriers() {
   return db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned }).from(courierProfiles).where(and(eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).orderBy(courierProfiles.name);
 }
 
+export async function listSellerCouriers() {
+  return listCouriers();
+}
+
 export async function getAdminUserDirectory() {
   const db = await getDb();
   if (!db) return { buyers: [], sellers: [], couriers: [], pendingSellers: [], pendingCouriers: [] };

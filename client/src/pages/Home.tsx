@@ -65,7 +65,7 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (product: Pr
   return (
     <article className="product-card">
       <Link href={`/produk/${product.id}`} className={`product-visual ${product.accent}`} aria-label={`Lihat ${product.name}`}>
-        <span className="product-emoji">{product.emoji}</span>
+        {product.imageUrl ? <img className="product-image" src={product.imageUrl} alt={product.name} /> : <span className="product-emoji">{product.emoji}</span>}
         {product.badge && <span className="product-badge">{product.badge}</span>}
         <span className="visual-arrow"><ArrowRight size={16} /></span>
       </Link>
@@ -164,7 +164,7 @@ export default function Home() {
   const { addItem } = useCart();
   const syncedProducts = trpc.marketplace.products.useQuery(undefined, { refetchInterval: 15000 });
   const catalogProducts = useMemo(() => {
-    const remote = (syncedProducts.data || []).map((item) => ({ id: String(item.id), name: item.name, vendor: item.vendor, category: item.category, price: item.price, unit: "", accent: "sunset", emoji: "🛍️", description: `${item.name} dari ${item.vendor}.`, location: item.location, eta: "30–45 menit", badge: "Mitra lokal" } satisfies Product));
+    const remote = (syncedProducts.data || []).map((item) => ({ id: String(item.id), name: item.name, vendor: item.vendor, category: item.category, price: item.price, unit: "", accent: "sunset", emoji: "🛍️", imageUrl: item.imageUrl, description: `${item.name} dari ${item.vendor}.`, location: item.location, eta: "30–45 menit", badge: "Mitra lokal" } satisfies Product));
     return remote.length ? [...remote, ...products] : products;
   }, [syncedProducts.data]);
   const visibleProducts = useMemo(() => catalogProducts.filter((product) => (activeCategory === "Semua" || product.category.toLowerCase() === activeCategory.toLowerCase()) && `${product.name} ${product.vendor}`.toLowerCase().includes(search.toLowerCase())), [activeCategory, catalogProducts, search]);

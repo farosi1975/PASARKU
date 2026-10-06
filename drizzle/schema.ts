@@ -18,6 +18,7 @@ export const sellerProfiles = mysqlTable("seller_profiles", {
   ownerName: varchar("ownerName", { length: 160 }).notNull(),
   whatsapp: varchar("whatsapp", { length: 32 }).notNull().unique(),
   village: varchar("village", { length: 80 }).notNull(),
+  preferredCourierId: int("preferredCourierId"),
   verificationStatus: mysqlEnum("verificationStatus", ["pending", "verified", "rejected", "unverified"]).default("pending").notNull(),
   isBanned: int("isBanned").default(0).notNull(),
   verifiedAt: timestamp("verifiedAt"),
@@ -79,6 +80,7 @@ export const products = mysqlTable("products", {
   category: varchar("category", { length: 80 }).notNull(),
   price: int("price").notNull(),
   stock: int("stock").default(0).notNull(),
+  imageUrl: text("imageUrl"),
   vendor: varchar("vendor", { length: 160 }).notNull(),
   location: varchar("location", { length: 100 }).notNull(),
   status: mysqlEnum("status", ["draft", "approved", "archived"]).default("draft").notNull(),
@@ -100,6 +102,7 @@ export const orders = mysqlTable("orders", {
   payment: varchar("payment", { length: 30 }).notNull(),
   status: mysqlEnum("status", ["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]).default("Menunggu").notNull(),
   courierId: int("courierId"),
+  courierAcceptedAt: timestamp("courierAcceptedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

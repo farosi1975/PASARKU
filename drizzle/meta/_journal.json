@@ -57,6 +57,13 @@
       "when": 1791229599573,
       "tag": "0007_spicy_black_bolt",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1791274011054,
+      "tag": "0008_acoustic_overlord",
+      "breakpoints": true
     }
   ]
 }

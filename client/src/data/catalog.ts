@@ -10,6 +10,7 @@ export type Product = {
   description: string;
   location: string;
   eta: string;
+  imageUrl?: string | null;
   badge?: string;
 };
 

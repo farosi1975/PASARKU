@@ -3,7 +3,7 @@ export const SELLER_PRODUCTS_KEY = "pasarku_seller_products";
 export const SELLER_OTP = "123456";
 
 export type SellerProfile = { shopName: string; ownerName: string; phone: string; village: string; verifiedAt?: string; verificationStatus?: "pending" | "verified" | "rejected" | "unverified" };
-export type SellerProduct = { id: string; name: string; category: string; price: number; stock: number; createdAt: string };
+export type SellerProduct = { id: string; name: string; category: string; price: number; stock: number; imageUrl?: string | null; createdAt: string };
 
 export function normalizeSellerPhone(value: string) {
   const digits = value.replace(/\D/g, "");

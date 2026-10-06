@@ -4,11 +4,12 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerProducts, resetMarketplaceData, upsertAccountRole } from "./db";
+import { getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerProducts, resetMarketplaceData, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendFonnteMessage } from "./fonnte";
+import { storagePut } from "./storage";
 
 const phone = z.string().min(10).max(32);
 const dbRequired = async () => { const db = await getDb(); if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database belum tersedia." }); return db; };
@@ -30,6 +31,16 @@ const beginOtpSend = (scope: string, whatsapp: string) => {
   otpLastSent.set(key, Date.now());
 };
 const cancelOtpCooldown = (scope: string, whatsapp: string) => { otpLastSent.delete(otpKey(scope, whatsapp)); };
+const uploadProductImage = async (whatsapp: string, imageData?: string) => {
+  if (!imageData) return null;
+  const match = imageData.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
+  if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "Foto harus berupa JPG, PNG, atau WebP." });
+  const buffer = Buffer.from(match[2], "base64");
+  if (buffer.length > 5 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "Ukuran foto maksimal 5 MB." });
+  const extension = match[1].split("/")[1].replace("jpeg", "jpg");
+  const stored = await storagePut(`pasarku/products/${whatsapp}.${extension}`, buffer, match[1]);
+  return stored.url;
+};
 const invalidOtp = (challenge: { attempts: number }, message: string) => {
   challenge.attempts += 1;
   return new TRPCError({ code: "UNAUTHORIZED", message: challenge.attempts >= OTP_MAX_ATTEMPTS ? "Batas 5 percobaan tercapai. Minta OTP baru setelah cooldown." : `${message} Percobaan tersisa ${OTP_MAX_ATTEMPTS - challenge.attempts}.` });
@@ -132,7 +143,28 @@ export const appRouter = router({
       await db.insert(adminProfiles).values({ name: input.name.trim(), whatsapp, verifiedAt: new Date() }).onDuplicateKeyUpdate({ set: { name: input.name.trim(), verifiedAt: new Date() } });
       return getAdminProfile(whatsapp);
     }),
+    sellerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
+      const db = await dbRequired();
+      const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      return rows[0] ?? null;
+    }),
     sellerProducts: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => listSellerProducts(input.whatsapp)),
+    sellerCouriers: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
+      const db = await dbRequired();
+      const seller = await db.select({ preferredCourierId: sellerProfiles.preferredCourierId }).from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      return { couriers: await listSellerCouriers(), preferredCourierId: seller[0]?.preferredCourierId ?? null };
+    }),
+    setSellerCourier: publicProcedure.input(z.object({ whatsapp: phone, courierId: z.number().int().positive().nullable() })).mutation(async ({ input }) => {
+      const db = await dbRequired();
+      const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual belum terverifikasi." });
+      if (input.courierId) {
+        const courier = await db.select().from(courierProfiles).where(and(eq(courierProfiles.id, input.courierId), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1);
+        if (!courier[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Kurir pilihan tidak tersedia." });
+      }
+      await db.update(sellerProfiles).set({ preferredCourierId: input.courierId }).where(eq(sellerProfiles.id, seller[0].id));
+      return { preferredCourierId: input.courierId } as const;
+    }),
     requestSellerOtp: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2) })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
       beginOtpSend("seller", whatsapp);
@@ -155,10 +187,11 @@ export const appRouter = router({
       await upsertAccountRole(whatsapp, "seller", input.ownerName.trim());
       const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),
-    createProduct: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2), category: z.string().min(2), price: z.number().int().positive(), stock: z.number().int().nonnegative() })).mutation(async ({ input }) => {
+    createProduct: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2), category: z.string().min(2), price: z.number().int().positive(), stock: z.number().int().nonnegative(), imageData: z.string().optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1); if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual masih menunggu verifikasi manual Admin." });
-      const result = await db.insert(products).values({ sellerId: seller[0].id, name: input.name, category: input.category, price: input.price, stock: input.stock, vendor: seller[0].shopName, location: seller[0].village, status: "approved" });
-      return { id: Number((result as any)[0]?.insertId ?? 0), status: "approved" as const };
+      const imageUrl = await uploadProductImage(normalizePhone(input.whatsapp), input.imageData);
+      const result = await db.insert(products).values({ sellerId: seller[0].id, name: input.name, category: input.category, price: input.price, stock: input.stock, imageUrl, vendor: seller[0].shopName, location: seller[0].village, status: "approved" });
+      return { id: Number((result as any)[0]?.insertId ?? 0), imageUrl, status: "approved" as const };
     }),
     requestCourierOtp: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, vehicle: z.string().min(2) })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp); beginOtpSend("courier", whatsapp); const otp = String(randomInt(100000, 1000000));
@@ -221,8 +254,18 @@ export const appRouter = router({
       return rows[0]?.verificationStatus === "verified" && !rows[0].isBanned ? rows[0] : null;
     }),
     order: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).query(({ input }) => getOrderWithItems(input.orderCode)),
-    assignCourier: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), whatsapp: phone })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1); if (!courier[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Kurir belum terverifikasi atau sedang diblokir." }); await db.update(orders).set({ courierId: courier[0].id, status: "Diproses" }).where(eq(orders.orderCode, input.orderCode)); return { success: true, courier: courier[0] }; }),
+    assignCourier: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), whatsapp: phone })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1); if (!courier[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Kurir belum terverifikasi atau sedang diblokir." }); await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null }).where(eq(orders.orderCode, input.orderCode)); return { success: true, courier: courier[0] }; }),
     courierOrders: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => { const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1); return courier[0]?.verificationStatus === "verified" && !courier[0].isBanned ? listCourierOrders(courier[0].id) : []; }),
+    acceptCourierTask: publicProcedure.input(z.object({ whatsapp: phone, orderCode: z.string().min(3) })).mutation(async ({ input }) => {
+      const db = await dbRequired();
+      const courier = await db.select().from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1);
+      if (!courier[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Kurir belum terverifikasi atau sedang diblokir." });
+      const order = await db.select().from(orders).where(and(eq(orders.orderCode, input.orderCode), eq(orders.courierId, courier[0].id))).limit(1);
+      if (!order[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Tugas tidak ditemukan untuk kurir ini." });
+      if (order[0].status !== "Menunggu") throw new TRPCError({ code: "CONFLICT", message: "Tugas ini sudah diterima atau sudah diproses." });
+      await db.update(orders).set({ status: "Diproses", courierAcceptedAt: new Date() }).where(eq(orders.id, order[0].id));
+      return { success: true as const, orderCode: input.orderCode, status: "Diproses" as const };
+    }),
     updateOrderStatus: publicProcedure.input(z.object({ orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { const db = await dbRequired(); await db.update(orders).set({ status: input.status }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
     updateAdminOrderStatus: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); await db.update(orders).set({ status: input.status }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
     confirmDelivery: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).mutation(async ({ input }) => { const db = await dbRequired(); await db.update(orders).set({ status: "Selesai" }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
