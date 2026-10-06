@@ -158,6 +158,13 @@ export const appRouter = router({
       const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
       return rows[0] ?? null;
     }),
+    setSellerOpen: publicProcedure.input(z.object({ whatsapp: phone, isOpen: z.boolean() })).mutation(async ({ input }) => {
+      const db = await dbRequired();
+      const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual belum terverifikasi." });
+      await db.update(sellerProfiles).set({ isOpen: input.isOpen ? 1 : 0, updatedAt: new Date() }).where(eq(sellerProfiles.id, seller[0].id));
+      return { isOpen: input.isOpen } as const;
+    }),
     sellerProducts: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => listSellerProducts(input.whatsapp)),
     sellerCouriers: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
       const db = await dbRequired();
@@ -251,13 +258,13 @@ export const appRouter = router({
       await upsertAccountRole(whatsapp, "buyer", input.name.trim());
       return getBuyerProfile(whatsapp);
     }),
-    createOrder: publicProcedure.input(z.object({ customerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().min(3), note: z.string().optional(), subtotal: z.number().int().nonnegative(), delivery: z.number().int().nonnegative(), total: z.number().int().nonnegative(), payment: z.string().min(2), items: z.array(z.object({ productId: z.number().int().optional(), productName: z.string(), price: z.number().int(), quantity: z.number().int().positive() })).min(1) })).mutation(async ({ input }) => {
+    createOrder: publicProcedure.input(z.object({ customerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().min(3), currentLocation: z.string().max(180).optional(), note: z.string().optional(), subtotal: z.number().int().nonnegative(), delivery: z.number().int().nonnegative(), total: z.number().int().nonnegative(), payment: z.string().min(2), items: z.array(z.object({ productId: z.number().int().optional(), productName: z.string(), price: z.number().int(), quantity: z.number().int().positive() })).min(1) })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existingBuyer = await getBuyerProfile(whatsapp);
       if (existingBuyer?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli diblokir oleh Admin PASARKU." });
       const orderCode = `INV-${Date.now()}`;
       await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp, village: input.village, address: input.address }).onDuplicateKeyUpdate({ set: { name: input.customerName, village: input.village, address: input.address, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.customerName.trim());
-      const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, note: input.note, subtotal: input.subtotal, delivery: input.delivery, total: input.total, payment: input.payment, status: "Menunggu" });
+      const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, currentLocation: input.currentLocation || null, note: input.note, subtotal: input.subtotal, delivery: input.delivery, total: input.total, payment: input.payment, status: "Menunggu" });
       const orderId = Number((result as any)[0]?.insertId ?? 0);
       await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity })));
       let assignedCourier: { whatsapp: string; name: string } | null = null;

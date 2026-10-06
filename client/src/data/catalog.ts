@@ -12,6 +12,7 @@ export type Product = {
   eta: string;
   imageUrl?: string | null;
   badge?: string;
+  storeOpen?: boolean;
 };
 
 export type OrderStatus = "Menunggu" | "Diproses" | "Diantar" | "Selesai";
@@ -22,6 +23,7 @@ export type MockOrder = {
   whatsapp?: string;
   village: string;
   address?: string;
+  currentLocation?: string | null;
   total: number;
   items: number;
   payment: "COD" | "Transfer";

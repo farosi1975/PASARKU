@@ -6,7 +6,9 @@ describe("seller and courier dashboard features", () => {
   it("keeps the new database fields in the Drizzle contract", () => {
     expect(products.imageUrl).toBeDefined();
     expect(sellerProfiles.preferredCourierId).toBeDefined();
+    expect(sellerProfiles.isOpen).toBeDefined();
     expect(orders.courierAcceptedAt).toBeDefined();
+    expect(orders.currentLocation).toBeDefined();
   });
 
   it("contains the reviewed non-destructive migration", () => {
@@ -14,6 +16,9 @@ describe("seller and courier dashboard features", () => {
     expect(migration).toContain("ADD `imageUrl` text");
     expect(migration).toContain("ADD `preferredCourierId` int");
     expect(migration).toContain("ADD `courierAcceptedAt` timestamp");
+    const latestMigration = readFileSync(new URL("../drizzle/0009_nifty_moonstone.sql", import.meta.url), "utf8");
+    expect(latestMigration).toContain("ADD `currentLocation` text");
+    expect(latestMigration).toContain("ADD `isOpen` int DEFAULT 1 NOT NULL");
   });
 
   it("exposes the seller photo and courier preference flows in the UI", () => {
@@ -33,5 +38,13 @@ describe("seller and courier dashboard features", () => {
     expect(router).toContain("preferredCourierId");
     expect(sellerPage).toContain("saveProductEdit");
     expect(sellerPage).toContain("removeProduct");
+    expect(sellerPage).toContain("setSellerOpen");
+    expect(sellerPage).toContain("Toko buka");
+    const courierPage = readFileSync(new URL("../client/src/pages/Courier.tsx", import.meta.url), "utf8");
+    const homePage = readFileSync(new URL("../client/src/pages/Home.tsx", import.meta.url), "utf8");
+    expect(courierPage).toContain("Masuk tanpa OTP");
+    expect(courierPage).toContain("Masuk tanpa OTP. Tugas pengantaran Anda sudah dimuat.");
+    expect(homePage).toContain("useCurrentLocation");
+    expect(homePage).toContain("currentLocation");
   });
 });

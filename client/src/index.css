@@ -930,3 +930,22 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .seller-icon-action:hover { background: #f9e9e1; }
 .seller-icon-action.danger { color: #b64b3c; }
 .seller-icon-action:disabled { opacity: .5; cursor: not-allowed; }
+
+.seller-store-toggle { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #e8c8b9; border-radius: 999px; padding: 8px 12px; background: #fff8f3; color: #a85e42; font-size: 10px; font-weight: 800; cursor: pointer; }
+.seller-store-toggle.open { border-color: #b8dcc4; background: #f1fbf3; color: #267143; }
+.seller-store-toggle.closed { color: #8b6c61; }
+.store-toggle-dot { width: 8px; height: 8px; border-radius: 50%; background: #c86b4b; }
+.seller-store-toggle.open .store-toggle-dot { background: #3a9b5c; }
+.seller-store-toggle:disabled { opacity: .6; cursor: wait; }
+.seller-store-status { display: inline-flex; margin-top: 5px; font-size: 10px; font-weight: 800; }
+.seller-store-status.open { color: #267143; }
+.seller-store-status.closed { color: #a85e42; }
+.current-location-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 12px; padding: 11px 12px; border: 1px solid #eadbd2; border-radius: 10px; background: #fffaf6; }
+.current-location-box > div { min-width: 0; display: grid; gap: 3px; }
+.current-location-box strong { color: #493b36; font-size: 11px; }
+.current-location-box small { color: #8b746b; font-size: 10px; line-height: 1.4; }
+.current-location-box .outline-button { flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 640px) { .current-location-box { align-items: flex-start; flex-direction: column; } .current-location-box .outline-button { width: 100%; } }
+
+.customer-location, .task-current-location { color: #a85e42; font-weight: 700; }
+.task-current-location { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 10px; }

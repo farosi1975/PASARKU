@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { ENV } from "./_core/env";
 import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, userAccounts, users } from "../drizzle/schema";
@@ -35,7 +35,8 @@ export async function getUserByOpenId(openId: string) {
 
 export async function listApprovedProducts() {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(products).where(eq(products.status, "approved")).orderBy(desc(products.createdAt));
+  const rows = await db.select({ product: products }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(and(eq(products.status, "approved"), or(isNull(products.sellerId), eq(sellerProfiles.isOpen, 1)))).orderBy(desc(products.createdAt));
+  return rows.map((row) => row.product);
 }
 
 export async function listSellerProducts(whatsapp: string) {
