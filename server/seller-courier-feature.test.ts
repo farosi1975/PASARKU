@@ -23,4 +23,15 @@ describe("seller and courier dashboard features", () => {
     expect(sellerPage).toContain("setSellerCourier");
     expect(courierPage).toContain("acceptCourierTask");
   });
+
+  it("exposes protected product management and assignment notification flows", () => {
+    const router = readFileSync(new URL("./routers.ts", import.meta.url), "utf8");
+    const sellerPage = readFileSync(new URL("../client/src/pages/Seller.tsx", import.meta.url), "utf8");
+    expect(router).toContain("updateProduct:");
+    expect(router).toContain("deleteProduct:");
+    expect(router).toContain("notifyCourierAssignment");
+    expect(router).toContain("preferredCourierId");
+    expect(sellerPage).toContain("saveProductEdit");
+    expect(sellerPage).toContain("removeProduct");
+  });
 });

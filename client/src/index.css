@@ -920,3 +920,13 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 @media (max-width: 640px) { .seller-courier-controls { align-items: stretch; flex-direction: column; } }
 
 .product-image { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
+
+.seller-form-actions { display: flex; gap: 8px; }
+.seller-form-actions .primary-button { flex: 1; }
+.seller-cancel-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid #eadbd2; border-radius: 8px; padding: 0 13px; color: #7f695f; background: #fff; font-size: 10px; font-weight: 800; cursor: pointer; }
+.seller-product-info { min-width: 0; flex: 1; }
+.seller-product-actions { display: flex; gap: 5px; margin-left: auto; }
+.seller-icon-action { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid #eadbd2; border-radius: 7px; color: #a0674f; background: #fffaf6; cursor: pointer; }
+.seller-icon-action:hover { background: #f9e9e1; }
+.seller-icon-action.danger { color: #b64b3c; }
+.seller-icon-action:disabled { opacity: .5; cursor: not-allowed; }

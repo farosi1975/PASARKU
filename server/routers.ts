@@ -66,6 +66,16 @@ const notifyVerificationResult = async (target: string, role: "seller" | "courie
     return { sent: false as const, statusText };
   }
 };
+const notifyCourierAssignment = async (target: string, orderCode: string, total: number, source: "otomatis" | "Admin") => {
+  const message = `PASARKU: Pesanan ${orderCode} telah ditugaskan ${source === "otomatis" ? "secara otomatis berdasarkan pilihan toko" : "oleh Admin"} kepada Anda. Total COD: Rp${total.toLocaleString("id-ID")}. Buka portal kurir untuk menerima dan mengantar tugas.`;
+  try {
+    await sendFonnteMessage(target, message);
+    return { sent: true as const };
+  } catch (error) {
+    console.error("[FONNTE] Notifikasi assignment kurir gagal:", error instanceof Error ? error.message : error);
+    return { sent: false as const };
+  }
+};
 
 export const appRouter = router({
   system: systemRouter,
@@ -193,6 +203,26 @@ export const appRouter = router({
       const result = await db.insert(products).values({ sellerId: seller[0].id, name: input.name, category: input.category, price: input.price, stock: input.stock, imageUrl, vendor: seller[0].shopName, location: seller[0].village, status: "approved" });
       return { id: Number((result as any)[0]?.insertId ?? 0), imageUrl, status: "approved" as const };
     }),
+    updateProduct: publicProcedure.input(z.object({ whatsapp: phone, productId: z.number().int().positive(), name: z.string().min(2), category: z.string().min(2), price: z.number().int().positive(), stock: z.number().int().nonnegative(), imageData: z.string().optional() })).mutation(async ({ input }) => {
+      const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp);
+      const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1);
+      if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual belum terverifikasi." });
+      const product = await db.select().from(products).where(and(eq(products.id, input.productId), eq(products.sellerId, seller[0].id))).limit(1);
+      if (!product[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Produk tidak ditemukan di toko Anda." });
+      const imageUrl = input.imageData ? await uploadProductImage(whatsapp, input.imageData) : product[0].imageUrl;
+      await db.update(products).set({ name: input.name.trim(), category: input.category, price: input.price, stock: input.stock, imageUrl, vendor: seller[0].shopName, location: seller[0].village, updatedAt: new Date() }).where(eq(products.id, input.productId));
+      const rows = await db.select().from(products).where(eq(products.id, input.productId)).limit(1);
+      return rows[0];
+    }),
+    deleteProduct: publicProcedure.input(z.object({ whatsapp: phone, productId: z.number().int().positive() })).mutation(async ({ input }) => {
+      const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp);
+      const seller = await db.select({ id: sellerProfiles.id, verificationStatus: sellerProfiles.verificationStatus, isBanned: sellerProfiles.isBanned }).from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1);
+      if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual belum terverifikasi." });
+      const product = await db.select({ id: products.id }).from(products).where(and(eq(products.id, input.productId), eq(products.sellerId, seller[0].id))).limit(1);
+      if (!product[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Produk tidak ditemukan di toko Anda." });
+      await db.delete(products).where(eq(products.id, input.productId));
+      return { success: true as const, productId: input.productId };
+    }),
     requestCourierOtp: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, vehicle: z.string().min(2) })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp); beginOtpSend("courier", whatsapp); const otp = String(randomInt(100000, 1000000));
       courierChallenges.set(whatsapp, { otp, name: input.name.trim(), vehicle: input.vehicle, expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 });
@@ -222,7 +252,33 @@ export const appRouter = router({
       return getBuyerProfile(whatsapp);
     }),
     createOrder: publicProcedure.input(z.object({ customerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().min(3), note: z.string().optional(), subtotal: z.number().int().nonnegative(), delivery: z.number().int().nonnegative(), total: z.number().int().nonnegative(), payment: z.string().min(2), items: z.array(z.object({ productId: z.number().int().optional(), productName: z.string(), price: z.number().int(), quantity: z.number().int().positive() })).min(1) })).mutation(async ({ input }) => {
-      const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existingBuyer = await getBuyerProfile(whatsapp); if (existingBuyer?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli diblokir oleh Admin PASARKU." }); const orderCode = `INV-${Date.now()}`; await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp, village: input.village, address: input.address }).onDuplicateKeyUpdate({ set: { name: input.customerName, village: input.village, address: input.address, updatedAt: new Date() } }); await upsertAccountRole(whatsapp, "buyer", input.customerName.trim()); const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, note: input.note, subtotal: input.subtotal, delivery: input.delivery, total: input.total, payment: input.payment, status: "Menunggu" }); const orderId = Number((result as any)[0]?.insertId ?? 0); await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity }))); return getOrderWithItems(orderCode);
+      const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existingBuyer = await getBuyerProfile(whatsapp);
+      if (existingBuyer?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli diblokir oleh Admin PASARKU." });
+      const orderCode = `INV-${Date.now()}`;
+      await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp, village: input.village, address: input.address }).onDuplicateKeyUpdate({ set: { name: input.customerName, village: input.village, address: input.address, updatedAt: new Date() } });
+      await upsertAccountRole(whatsapp, "buyer", input.customerName.trim());
+      const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, note: input.note, subtotal: input.subtotal, delivery: input.delivery, total: input.total, payment: input.payment, status: "Menunggu" });
+      const orderId = Number((result as any)[0]?.insertId ?? 0);
+      await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity })));
+      let assignedCourier: { whatsapp: string; name: string } | null = null;
+      const hasProductIds = input.items.every((item) => item.productId !== undefined);
+      if (hasProductIds) {
+        const productRows = await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId }).from(products).where(eq(products.id, item.productId as number)).limit(1)));
+        const sellerIds = Array.from(new Set(productRows.map((rows) => rows[0]?.sellerId).filter((id): id is number => id !== null && id !== undefined)));
+        if (sellerIds.length === 1 && productRows.every((rows) => rows[0])) {
+          const seller = await db.select({ preferredCourierId: sellerProfiles.preferredCourierId }).from(sellerProfiles).where(eq(sellerProfiles.id, sellerIds[0])).limit(1);
+          const preferredCourierId = seller[0]?.preferredCourierId;
+          if (preferredCourierId) {
+            const courier = await db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp }).from(courierProfiles).where(and(eq(courierProfiles.id, preferredCourierId), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1);
+            if (courier[0]) {
+              await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null }).where(eq(orders.id, orderId));
+              assignedCourier = { whatsapp: courier[0].whatsapp, name: courier[0].name };
+            }
+          }
+        }
+      }
+      if (assignedCourier) void notifyCourierAssignment(assignedCourier.whatsapp, orderCode, input.total, "otomatis");
+      return getOrderWithItems(orderCode);
     }),
     orders: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listOrders(); }),
     dashboardStats: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getDashboardStats(); }),
@@ -254,7 +310,16 @@ export const appRouter = router({
       return rows[0]?.verificationStatus === "verified" && !rows[0].isBanned ? rows[0] : null;
     }),
     order: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).query(({ input }) => getOrderWithItems(input.orderCode)),
-    assignCourier: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), whatsapp: phone })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1); if (!courier[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Kurir belum terverifikasi atau sedang diblokir." }); await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null }).where(eq(orders.orderCode, input.orderCode)); return { success: true, courier: courier[0] }; }),
+    assignCourier: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), whatsapp: phone })).mutation(async ({ input }) => {
+      await requireAdminSession(input.sessionToken); const db = await dbRequired();
+      const courier = await db.select().from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1);
+      if (!courier[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Kurir belum terverifikasi atau sedang diblokir." });
+      const order = await db.select({ total: orders.total }).from(orders).where(eq(orders.orderCode, input.orderCode)).limit(1);
+      if (!order[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Pesanan tidak ditemukan." });
+      await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null }).where(eq(orders.orderCode, input.orderCode));
+      const notification = await notifyCourierAssignment(courier[0].whatsapp, input.orderCode, order[0].total, "Admin");
+      return { success: true as const, courier: courier[0], notificationSent: notification.sent };
+    }),
     courierOrders: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => { const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1); return courier[0]?.verificationStatus === "verified" && !courier[0].isBanned ? listCourierOrders(courier[0].id) : []; }),
     acceptCourierTask: publicProcedure.input(z.object({ whatsapp: phone, orderCode: z.string().min(3) })).mutation(async ({ input }) => {
       const db = await dbRequired();
