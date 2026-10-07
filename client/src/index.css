@@ -983,3 +983,11 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .pwa-install-dismiss { display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; }
 .pwa-install-dismiss:hover { color: var(--ink); background: var(--cream); }
 @media (max-width: 540px) { .pwa-install-prompt { right: 12px; bottom: 12px; width: calc(100vw - 24px); } }
+
+.village-filter { min-height: 42px; border: 1px solid var(--line); border-radius: 999px; padding: 0 14px; background: var(--surface); color: var(--ink); font: inherit; }
+.seller-location-toggle { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #b8d8c5; border-radius: 999px; padding: 10px 14px; background: #f1fbf4; color: #276744; font-weight: 700; cursor: pointer; }
+.seller-location-toggle:disabled { opacity: .65; cursor: wait; }
+.seller-hours-inputs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.seller-hours-inputs input { border: 1px solid var(--line); border-radius: 9px; padding: 8px 9px; color: var(--ink); background: var(--surface); }
+.seller-hours-inputs span { color: var(--muted); font-size: 12px; }
+.seller-location-card small { overflow-wrap: anywhere; }

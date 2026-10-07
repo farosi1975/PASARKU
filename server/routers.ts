@@ -10,7 +10,7 @@ import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendFonnteMessage } from "./fonnte";
 import { storagePut } from "./storage";
-import { calculateShippingCost } from "../shared/shipping";
+import { calculateShippingCost, parseCoordinates } from "../shared/shipping";
 
 const phone = z.string().min(10).max(32);
 const dbRequired = async () => { const db = await getDb(); if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database belum tersedia." }); return db; };
@@ -166,6 +166,20 @@ export const appRouter = router({
       await db.update(sellerProfiles).set({ isOpen: input.isOpen ? 1 : 0, updatedAt: new Date() }).where(eq(sellerProfiles.id, seller[0].id));
       return { isOpen: input.isOpen } as const;
     }),
+    setSellerLocation: publicProcedure.input(z.object({ whatsapp: phone, currentLocation: z.string().regex(/^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/) })).mutation(async ({ input }) => {
+      const db = await dbRequired();
+      const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual belum terverifikasi." });
+      await db.update(sellerProfiles).set({ currentLocation: input.currentLocation, updatedAt: new Date() }).where(eq(sellerProfiles.id, seller[0].id));
+      return { currentLocation: input.currentLocation } as const;
+    }),
+    setSellerHours: publicProcedure.input(z.object({ whatsapp: phone, openingTime: z.string().regex(/^\d{2}:\d{2}$/), closingTime: z.string().regex(/^\d{2}:\d{2}$/) })).mutation(async ({ input }) => {
+      const db = await dbRequired();
+      const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual belum terverifikasi." });
+      await db.update(sellerProfiles).set({ openingTime: input.openingTime, closingTime: input.closingTime, updatedAt: new Date() }).where(eq(sellerProfiles.id, seller[0].id));
+      return { openingTime: input.openingTime, closingTime: input.closingTime } as const;
+    }),
     setSellerFreeShipping: publicProcedure.input(z.object({ whatsapp: phone, freeShipping: z.boolean() })).mutation(async ({ input }) => {
       const db = await dbRequired();
       const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
@@ -268,20 +282,23 @@ export const appRouter = router({
       await upsertAccountRole(whatsapp, "buyer", input.name.trim());
       return getBuyerProfile(whatsapp);
     }),
-    createOrder: publicProcedure.input(z.object({ customerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().min(3), currentLocation: z.string().max(180).optional(), routeDistanceKm: z.number().positive().max(100).optional(), note: z.string().optional(), subtotal: z.number().int().nonnegative(), delivery: z.number().int().nonnegative(), total: z.number().int().nonnegative(), payment: z.string().min(2), items: z.array(z.object({ productId: z.number().int().optional(), productName: z.string(), price: z.number().int(), quantity: z.number().int().positive() })).min(1) })).mutation(async ({ input }) => {
+    createOrder: publicProcedure.input(z.object({ customerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().min(3), currentLocation: z.string().max(180).optional(), pickupLocation: z.string().max(180).optional(), routeDistanceKm: z.number().positive().max(100).optional(), note: z.string().optional(), subtotal: z.number().int().nonnegative(), delivery: z.number().int().nonnegative(), total: z.number().int().nonnegative(), payment: z.string().min(2), items: z.array(z.object({ productId: z.number().int().optional(), productName: z.string(), price: z.number().int(), quantity: z.number().int().positive() })).min(1) })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existingBuyer = await getBuyerProfile(whatsapp);
       if (existingBuyer?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli diblokir oleh Admin PASARKU." });
       const orderCode = `INV-${Date.now()}`;
       const shipping = await getShippingSettings();
       const productRowsForShipping = input.items.every((item) => item.productId !== undefined)
-        ? await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId, freeShipping: sellerProfiles.freeShipping }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(products.id, item.productId as number)).limit(1)))
+        ? await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId, freeShipping: sellerProfiles.freeShipping, sellerLocation: sellerProfiles.currentLocation }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(products.id, item.productId as number)).limit(1)))
         : [];
       const freeShipping = productRowsForShipping.length === input.items.length && productRowsForShipping.every((rows) => rows[0]?.freeShipping === 1);
-      const calculatedDelivery = calculateShippingCost(shipping, input.currentLocation, freeShipping, input.routeDistanceKm);
+      const pickupLocation = productRowsForShipping.length === input.items.length && productRowsForShipping.every((rows) => rows[0]) && new Set(productRowsForShipping.map((rows) => rows[0]?.sellerLocation || "")).size === 1 ? productRowsForShipping[0]?.[0]?.sellerLocation || null : null;
+      const pickupCoordinates = parseCoordinates(pickupLocation);
+      const sellerShipping = pickupCoordinates ? { ...shipping, originLatitude: String(pickupCoordinates.latitude), originLongitude: String(pickupCoordinates.longitude) } : shipping;
+      const calculatedDelivery = calculateShippingCost(sellerShipping, input.currentLocation, freeShipping, input.routeDistanceKm);
       const calculatedTotal = input.subtotal + calculatedDelivery;
       await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp, village: input.village, address: input.address }).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: input.customerName, village: input.village, address: input.address, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.customerName.trim());
-      const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, currentLocation: input.currentLocation || null, note: input.note, subtotal: input.subtotal, delivery: calculatedDelivery, total: calculatedTotal, payment: input.payment, status: "Menunggu" });
+      const result = await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, currentLocation: input.currentLocation || null, pickupLocation, routeDistanceKm: input.routeDistanceKm ? Math.round(input.routeDistanceKm * 10) : null, note: input.note, subtotal: input.subtotal, delivery: calculatedDelivery, total: calculatedTotal, payment: input.payment, status: "Menunggu" });
       const orderId = Number((result as any)[0]?.insertId ?? 0);
       await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity })));
       let assignedCourier: { whatsapp: string; name: string } | null = null;

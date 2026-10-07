@@ -14,6 +14,10 @@ export type Product = {
   badge?: string;
   storeOpen?: boolean;
   sellerFreeShipping?: boolean;
+  storeLocation?: string | null;
+  storeVillage?: string;
+  openingTime?: string;
+  closingTime?: string;
 };
 
 export type OrderStatus = "Menunggu" | "Diproses" | "Diantar" | "Selesai";
@@ -25,6 +29,8 @@ export type MockOrder = {
   village: string;
   address?: string;
   currentLocation?: string | null;
+  pickupLocation?: string | null;
+  routeDistanceKm?: number | null;
   total: number;
   items: number;
   payment: "COD" | "Transfer";

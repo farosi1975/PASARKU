@@ -26,6 +26,10 @@ export function distanceInKm(from: string | null | undefined, to: ShippingSettin
   const source = parseCoordinates(from);
   const target = parseCoordinates(`${to.originLatitude},${to.originLongitude}`);
   if (!source || !target) return 1;
+  return distanceBetweenCoordinates(source, target);
+}
+
+export function distanceBetweenCoordinates(source: { latitude: number; longitude: number }, target: { latitude: number; longitude: number }) {
   const earthRadiusKm = 6371;
   const latitudeDelta = ((target.latitude - source.latitude) * Math.PI) / 180;
   const longitudeDelta = ((target.longitude - source.longitude) * Math.PI) / 180;
