@@ -1,8 +1,8 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { ENV } from "./_core/env";
-import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, userAccounts, users } from "../drizzle/schema";
+import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, userAccounts, users, visitorStats } from "../drizzle/schema";
 
 let _pool: Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -189,16 +189,39 @@ export async function resetMarketplaceData() {
 
 export async function getDashboardStats() {
   const db = await getDb();
-  if (!db) return { activeOrders: 0, registeredStores: 0, readyCouriers: 0, revenue: 0 };
-  const [orderRows, storeRows, courierRows] = await Promise.all([
+  if (!db) return { activeOrders: 0, registeredStores: 0, readyCouriers: 0, revenue: 0, visitorTotal: 0, visitorToday: 0 };
+  const [orderRows, storeRows, courierRows, visitorRows] = await Promise.all([
     db.select({ status: orders.status, total: orders.total }).from(orders),
     db.select({ id: sellerProfiles.id, verificationStatus: sellerProfiles.verificationStatus, isBanned: sellerProfiles.isBanned }).from(sellerProfiles),
     db.select({ id: courierProfiles.id, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned }).from(courierProfiles),
+    db.select().from(visitorStats).where(eq(visitorStats.id, 1)).limit(1),
   ]);
+  const visitors = visitorRows[0];
   return {
     activeOrders: orderRows.filter((order) => order.status !== "Selesai" && order.status !== "Dibatalkan").length,
     registeredStores: storeRows.filter((store) => store.verificationStatus === "verified" && !store.isBanned).length,
     readyCouriers: courierRows.filter((courier) => courier.verificationStatus === "verified" && !courier.isBanned).length,
     revenue: orderRows.reduce((sum, order) => sum + order.total, 0),
+    visitorTotal: visitors?.totalVisits ?? 0,
+    visitorToday: visitors?.todayVisits ?? 0,
   };
+}
+
+const jakartaDate = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+
+export async function recordVisitorVisit() {
+  const db = await getDb();
+  if (!db) return { totalVisits: 0, todayVisits: 0 };
+  const today = jakartaDate();
+  await db.insert(visitorStats).values({ id: 1, totalVisits: 1, todayVisits: 1, lastVisitDate: today }).onConflictDoUpdate({
+    target: visitorStats.id,
+    set: {
+      totalVisits: sql`${visitorStats.totalVisits} + 1`,
+      todayVisits: sql`CASE WHEN ${visitorStats.lastVisitDate} = ${today} THEN ${visitorStats.todayVisits} + 1 ELSE 1 END`,
+      lastVisitDate: today,
+      updatedAt: new Date(),
+    },
+  });
+  const rows = await db.select({ totalVisits: visitorStats.totalVisits, todayVisits: visitorStats.todayVisits }).from(visitorStats).where(eq(visitorStats.id, 1)).limit(1);
+  return rows[0] ?? { totalVisits: 0, todayVisits: 0 };
 }

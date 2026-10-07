@@ -72,6 +72,14 @@ export const shippingSettings = pgTable("shipping_settings", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+export const visitorStats = pgTable("visitor_stats", {
+  id: serial("id").primaryKey(),
+  totalVisits: integer("totalVisits").default(0).notNull(),
+  todayVisits: integer("todayVisits").default(0).notNull(),
+  lastVisitDate: varchar("lastVisitDate", { length: 10 }).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
 export const adminProfiles = pgTable("admin_profiles", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 160 }).notNull(),

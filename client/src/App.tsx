@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -15,13 +16,25 @@ import Login from "./pages/Login";
 import Seller from "./pages/Seller";
 import BuyerProfile from "./pages/BuyerProfile";
 import PwaInstallPrompt from "./components/PwaInstallPrompt";
+import { trpc } from "./lib/trpc";
+
+function VisitorTracker() {
+  const recordVisit = trpc.marketplace.recordVisit.useMutation();
+  useEffect(() => {
+    const dateKey = new Date().toISOString().slice(0, 10);
+    const storageKey = `pasarku-visitor-recorded:${dateKey}`;
+    if (window.localStorage.getItem(storageKey)) return;
+    recordVisit.mutate(undefined, { onSuccess: () => window.localStorage.setItem(storageKey, "1") });
+  }, []);
+  return null;
+}
 
 function Router() {
   return <Switch><Route path="/" component={Home} /><Route path="/masuk" component={Login} /><Route path="/profil" component={BuyerProfile} /><Route path="/penjual" component={Seller} /><Route path="/produk/:id" component={ProductDetail} /><Route path="/pesanan/:id" component={OrderSummary} /><Route path="/admin" component={Admin} /><Route path="/kurir" component={Courier} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
 }
 
 function App() {
-  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><PwaInstallPrompt /><PreviewGate><CartProvider><Router /></CartProvider></PreviewGate></TooltipProvider></ThemeProvider></ErrorBoundary>;
+  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><PwaInstallPrompt /><PreviewGate><VisitorTracker /><CartProvider><Router /></CartProvider></PreviewGate></TooltipProvider></ThemeProvider></ErrorBoundary>;
 }
 
 export default App;

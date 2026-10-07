@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerProducts, resetMarketplaceData, saveShippingSettings, getShippingSettings, upsertAccountRole } from "./db";
+import { getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerProducts, recordVisitorVisit, resetMarketplaceData, saveShippingSettings, getShippingSettings, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -86,6 +86,7 @@ export const appRouter = router({
   }),
   marketplace: router({
     products: publicProcedure.query(() => listApprovedProducts()),
+    recordVisit: publicProcedure.mutation(() => recordVisitorVisit()),
     requestBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2).optional() })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
       beginOtpSend("buyer", whatsapp);
