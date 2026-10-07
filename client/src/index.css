@@ -1018,3 +1018,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .support-ticket-row p { margin: 7px 0 0; color: #4f4037; font-size: 13px; white-space: pre-wrap; }
 .support-ticket-row select { min-width: 120px; border: 1px solid #e5d6c9; border-radius: 9px; padding: 8px; background: #fff; color: #4f4037; }
 @media (max-width: 640px) { .help-admin-popover { right: -8px; } .support-ticket-row { flex-direction: column; } }
+
+.filter-button-active { color: var(--orange-dark); border-color: #f2b29b; background: #fff3ed; }
+.filter-reset-button { min-height: 38px; padding: 0 12px; border: 1px solid #f0c8b8; border-radius: 999px; color: #a6533d; background: #fff7f3; font: inherit; font-size: 11px; font-weight: 750; white-space: nowrap; cursor: pointer; }
+.filter-reset-button:hover { color: #fff; border-color: var(--orange); background: var(--orange); }
