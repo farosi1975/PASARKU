@@ -1070,3 +1070,16 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .print-footer { margin-top: 18px; padding-top: 7px; border-top: 1px solid #aaa; color: #555; font-size: 8px; text-align: center; }
 }
 @media (max-width: 640px) { .seller-order-row { grid-template-columns: 1fr auto; } .seller-order-row .print-actions { grid-column: 1 / -1; justify-content: flex-start; } }
+
+.print-size-select { min-height: 28px; padding: 0 7px; border: 1px solid #eadbd2; border-radius: 8px; color: #6f4b40; background: #fff; font: inherit; font-size: 9px; font-weight: 750; cursor: pointer; }
+.print-size-select:focus { outline: 3px solid rgba(239, 101, 61, .14); border-color: var(--orange); }
+@media print {
+  .print-sheet-a4 { width: 210mm; min-height: 297mm; }
+  .print-sheet-58mm { width: 58mm; min-height: 100mm; }
+  .print-sheet-80mm { width: 80mm; min-height: 100mm; }
+  .print-sheet-nota.print-size-a4 { max-width: 180mm; }
+  .print-sheet-nota.print-size-58mm, .print-sheet-nota.print-size-80mm { max-width: none; padding: 3mm; }
+  .print-sheet-stiker.print-size-58mm { min-height: 100mm; padding: 3mm; }
+  .print-sheet-stiker.print-size-80mm { min-height: 120mm; padding: 4mm; }
+  .print-sheet-stiker.print-size-a4 { min-height: 120mm; padding: 5mm; }
+}

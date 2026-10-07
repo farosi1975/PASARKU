@@ -26,11 +26,19 @@ export type PrintableOrder = {
 };
 
 type PrintMode = "nota" | "stiker";
+type PrintSize = "a4" | "58mm" | "80mm";
 
-function PrintSheet({ order, mode, sellerName }: { order: PrintableOrder; mode: PrintMode; sellerName?: string }) {
+const PRINT_SIZE_KEY = "pasarku_print_size";
+
+function readPrintSize(): PrintSize {
+  const saved = window.localStorage.getItem(PRINT_SIZE_KEY);
+  return saved === "a4" || saved === "58mm" || saved === "80mm" ? saved : "58mm";
+}
+
+function PrintSheet({ order, mode, size, sellerName }: { order: PrintableOrder; mode: PrintMode; size: PrintSize; sellerName?: string }) {
   const createdAt = order.createdAt ? new Date(order.createdAt).toLocaleString("id-ID") : new Date().toLocaleString("id-ID");
   const items = order.items || [];
-  return <div className={`print-sheet print-sheet-${mode}`}>
+  return <div className={`print-sheet print-sheet-${mode} print-size-${size}`}>
     <div className="print-brand"><span className="print-brand-mark">P</span><strong>PASARKU</strong><span>{mode === "stiker" ? "LABEL PENGANTARAN" : "NOTA PESANAN"}</span></div>
     <div className="print-order-code">#{order.id}</div>
     {mode === "stiker" ? <>
@@ -54,6 +62,8 @@ function PrintSheet({ order, mode, sellerName }: { order: PrintableOrder; mode: 
 
 export function OrderPrintActions({ order, sellerName, compact = false }: { order: PrintableOrder; sellerName?: string; compact?: boolean }) {
   const [mode, setMode] = useState<PrintMode | null>(null);
+  const [size, setSize] = useState<PrintSize>(() => readPrintSize());
+  const chooseSize = (next: PrintSize) => { setSize(next); window.localStorage.setItem(PRINT_SIZE_KEY, next); };
   useEffect(() => {
     if (!mode) return;
     const afterPrint = () => setMode(null);
@@ -63,9 +73,14 @@ export function OrderPrintActions({ order, sellerName, compact = false }: { orde
   }, [mode]);
   return <>
     <div className={`print-actions ${compact ? "compact" : ""}`}>
+      <select className="print-size-select" value={size} onChange={(event) => chooseSize(event.target.value as PrintSize)} aria-label="Ukuran printer">
+        <option value="58mm">58 mm</option>
+        <option value="80mm">80 mm</option>
+        <option value="a4">A4</option>
+      </select>
       <button type="button" onClick={() => setMode("nota")} aria-label={`Cetak nota ${order.id}`}><Printer size={compact ? 14 : 15} /> <span>Nota</span></button>
       <button type="button" onClick={() => setMode("stiker")} aria-label={`Cetak stiker ${order.id}`}><Tag size={compact ? 14 : 15} /> <span>Stiker</span></button>
     </div>
-    {mode && <PrintSheet order={order} mode={mode} sellerName={sellerName} />}
+    {mode && <PrintSheet order={order} mode={mode} size={size} sellerName={sellerName} />}
   </>;
 }
