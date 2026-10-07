@@ -1,0 +1,16 @@
+{
+  "name": "PASARKU — Marketplace Lokal Sawahan",
+  "short_name": "PASARKU",
+  "description": "Marketplace lokal Kecamatan Sawahan, Nganjuk.",
+  "lang": "id-ID",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#2d2948",
+  "theme_color": "#d45b39",
+  "categories": ["shopping", "marketplace"],
+  "icons": [
+    {"src": "/pwa-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ]
+}
