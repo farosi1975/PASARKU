@@ -17,6 +17,13 @@ function getForgeConfig() {
   return { forgeUrl: forgeUrl.replace(/\/+$/, ""), forgeKey };
 }
 
+function buildInlineDataUrl(data: Buffer | Uint8Array | string, contentType: string): string {
+  const base64 = typeof data === "string"
+    ? Buffer.from(data).toString("base64")
+    : Buffer.from(data).toString("base64");
+  return `data:${contentType};base64,${base64}`;
+}
+
 function normalizeKey(relKey: string): string {
   return relKey.replace(/^\/+/, "");
 }
@@ -33,8 +40,16 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream",
 ): Promise<{ key: string; url: string }> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
   const key = appendHashSuffix(normalizeKey(relKey));
+
+  // Render does not receive Manus' BUILT_IN_FORGE_* variables. For product
+  // photos, keep a durable MVP fallback in Neon instead of failing the whole
+  // product save. The products.imageUrl column is text and Neon is persistent.
+  if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
+    return { key, url: buildInlineDataUrl(data, contentType) };
+  }
+
+  const { forgeUrl, forgeKey } = getForgeConfig();
 
   // 1. Get presigned PUT URL from Forge
   const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
