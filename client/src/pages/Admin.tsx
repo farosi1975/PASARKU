@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Bell, Boxes, Check, ChevronDown, ClipboardList, Clock3, Eye, KeyRound, LayoutDashboard, MapPin, Menu, MessageCircle, MoreHorizontal, Package, Search, Settings, ShieldCheck, ShoppingBag, Store, Trash2, Truck, UserPlus, Users, X } from "lucide-react";
 import { Link } from "wouter";
-import { formatRupiah, mockOrders, type MockOrder, type OrderStatus } from "@/data/catalog";
+import { formatRupiah, type MockOrder, type OrderStatus } from "@/data/catalog";
 import { toast } from "sonner";
 import { normalizeWhatsApp } from "@/lib/auth";
 import { trpc } from "@/lib/trpc";
@@ -63,7 +63,7 @@ function AdminAuth({ onVerified }: { onVerified: (session: AdminSession) => void
 
 function AdminWorkspace({ session, onLogout }: { session: AdminSession; onLogout: () => void }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [orders, setOrders] = useState<MockOrder[]>(mockOrders);
+  const [orders, setOrders] = useState<MockOrder[]>([]);
   const [filter, setFilter] = useState<"Semua" | OrderStatus>("Semua");
   const [query, setQuery] = useState("");
   const [assignmentOrderId, setAssignmentOrderId] = useState("");

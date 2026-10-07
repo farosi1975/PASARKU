@@ -991,3 +991,5 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .seller-hours-inputs input { border: 1px solid var(--line); border-radius: 9px; padding: 8px 9px; color: var(--ink); background: var(--surface); }
 .seller-hours-inputs span { color: var(--muted); font-size: 12px; }
 .seller-location-card small { overflow-wrap: anywhere; }
+
+.courier-navigation-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; margin-top: 12px; min-height: 38px; font-size: 10px; text-decoration: none; }
