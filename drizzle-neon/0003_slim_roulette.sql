@@ -1,0 +1,1 @@
+ALTER TABLE "shipping_settings" ADD COLUMN "adminWhatsapp" varchar(32) DEFAULT '6281456015901' NOT NULL;

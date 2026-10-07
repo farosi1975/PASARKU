@@ -69,6 +69,7 @@ export const shippingSettings = pgTable("shipping_settings", {
   discountPercent: integer("discountPercent").default(0).notNull(),
   originLatitude: varchar("originLatitude", { length: 32 }).default("-7.602345").notNull(),
   originLongitude: varchar("originLongitude", { length: 32 }).default("111.904321").notNull(),
+  adminWhatsapp: varchar("adminWhatsapp", { length: 32 }).default("6281456015901").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 

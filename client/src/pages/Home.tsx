@@ -11,6 +11,7 @@ import { buildAdminWhatsAppLink } from "@/lib/whatsapp";
 import { AUTH_EVENT, USER_SESSION_KEY } from "@/lib/auth";
 import { SAWAHAN_VILLAGES } from "@/lib/locations";
 import { trpc } from "@/lib/trpc";
+import { HelpAdminButton } from "@/components/HelpAdminButton";
 
 function StoreIcon() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 10h18" /><path d="m4 10 1-6h14l1 6" /><path d="M5 10v10h14V10" /><path d="M9 20v-5h6v5" /></svg>;
@@ -53,6 +54,7 @@ function Header({ onCart }: { onCart: () => void }) {
           <a href="#jelajahi">Jelajahi</a>
           <a href="#cara-kerja">Cara kerja</a>
           <Link href="/penjual">Jual di PASARKU</Link>
+          <HelpAdminButton compact context="pertanyaan dari katalog PASARKU" />
         </nav>
         <div className="header-actions">
           <button className="icon-button cart-trigger" onClick={onCart} aria-label="Buka keranjang">
@@ -173,7 +175,7 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
     window.sessionStorage.setItem(`pasarku_order_${orderId}`, JSON.stringify(order));
     clearCart();
     onDone();
-    toast.success("Pesanan berhasil dibuat.", { description: "Admin PASARKU akan menghubungi Anda via WhatsApp untuk konfirmasi.", action: { label: "Hubungi WA", onClick: () => window.open(buildAdminWhatsAppLink(orderId, form.name), "_blank", "noopener,noreferrer") } });
+    toast.success("Pesanan berhasil dibuat.", { description: "Admin PASARKU akan menghubungi Anda via WhatsApp untuk konfirmasi.", action: { label: "Hubungi WA", onClick: () => window.open(buildAdminWhatsAppLink(orderId, form.name, shippingSettings.data?.adminWhatsapp), "_blank", "noopener,noreferrer") } });
     window.setTimeout(() => navigate(`/pesanan/${orderId}`), 300);
   };
   const setField = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));

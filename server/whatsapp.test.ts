@@ -9,4 +9,10 @@ describe("PASARKU WhatsApp admin link", () => {
     expect(decodeURIComponent(link)).toContain("#INV-101");
     expect(decodeURIComponent(link)).toContain("Sari Wulandari");
   });
+
+  it("uses the editable admin number for general help", () => {
+    const link = buildAdminWhatsAppLink(undefined, undefined, "0812 3456 7890", "toko dan ongkir");
+    expect(link).toContain("https://wa.me/081234567890?text=");
+    expect(decodeURIComponent(link)).toContain("toko dan ongkir");
+  });
 });

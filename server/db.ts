@@ -52,13 +52,13 @@ export async function listSellerProducts(whatsapp: string) {
 
 export async function getShippingSettings() {
   const db = await getDb();
-  if (!db) return { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321" };
+  if (!db) return { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901" };
   const rows = await db.select().from(shippingSettings).where(eq(shippingSettings.id, 1)).limit(1);
   const settings = rows[0];
-  return settings ? { ratePerKm: settings.ratePerKm, discountPercent: settings.discountPercent, originLatitude: settings.originLatitude, originLongitude: settings.originLongitude } : { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321" };
+  return settings ? { ratePerKm: settings.ratePerKm, discountPercent: settings.discountPercent, originLatitude: settings.originLatitude, originLongitude: settings.originLongitude, adminWhatsapp: settings.adminWhatsapp } : { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901" };
 }
 
-export async function saveShippingSettings(input: { ratePerKm: number; discountPercent: number; originLatitude: string; originLongitude: string }) {
+export async function saveShippingSettings(input: { ratePerKm: number; discountPercent: number; originLatitude: string; originLongitude: string; adminWhatsapp: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database belum tersedia.");
   await db.insert(shippingSettings).values({ id: 1, ...input }).onConflictDoUpdate({ target: shippingSettings.id, set: { ...input, updatedAt: new Date() } });
