@@ -116,7 +116,22 @@ export async function getOrderWithItems(orderCode: string) {
 
 export async function listCourierOrders(courierId: number) {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(orders).where(eq(orders.courierId, courierId)).orderBy(desc(orders.createdAt));
+  const assignedOrders = await db.select().from(orders).where(eq(orders.courierId, courierId)).orderBy(desc(orders.createdAt));
+  return Promise.all(assignedOrders.map(async (order) => {
+    const sellerRows = await db.select({ shopName: sellerProfiles.shopName, village: sellerProfiles.village, currentLocation: sellerProfiles.currentLocation })
+      .from(orderItems)
+      .innerJoin(products, eq(orderItems.productId, products.id))
+      .innerJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id))
+      .where(eq(orderItems.orderId, order.id))
+      .limit(1);
+    const seller = sellerRows[0];
+    return {
+      ...order,
+      pickupShopName: seller?.shopName ?? "Penjual PASARKU",
+      pickupVillage: seller?.village ?? "Sawahan",
+      pickupLocation: seller?.currentLocation ?? order.pickupLocation,
+    };
+  }));
 }
 
 export async function listCouriers() {

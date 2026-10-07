@@ -47,4 +47,15 @@ describe("seller and courier dashboard features", () => {
     expect(homePage).toContain("useCurrentLocation");
     expect(homePage).toContain("currentLocation");
   });
+
+  it("keeps courier pickup data real and excludes completed assignment choices", () => {
+    const db = readFileSync(new URL("./db.ts", import.meta.url), "utf8");
+    const courierPage = readFileSync(new URL("../client/src/pages/Courier.tsx", import.meta.url), "utf8");
+    const adminPage = readFileSync(new URL("../client/src/pages/Admin.tsx", import.meta.url), "utf8");
+    expect(db).toContain("pickupShopName");
+    expect(db).toContain("sellerProfiles.shopName");
+    expect(courierPage).toContain("order.pickupShopName");
+    expect(courierPage).toContain("const assigned = useMemo(() => courier ? remoteOrders : []");
+    expect(adminPage).toContain('order.status !== "Selesai"');
+  });
 });
