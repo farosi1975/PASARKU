@@ -33,6 +33,9 @@ export type MockOrder = {
   pickupShopName?: string | null;
   pickupVillage?: string | null;
   routeDistanceKm?: number | null;
+  subtotal?: number;
+  delivery?: number;
+  note?: string;
   total: number;
   items: number;
   payment: "COD" | "Transfer";

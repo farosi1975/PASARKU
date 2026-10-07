@@ -50,6 +50,25 @@ export async function listSellerProducts(whatsapp: string) {
   return db.select().from(products).where(eq(products.sellerId, sellers[0].id)).orderBy(desc(products.createdAt));
 }
 
+export async function listSellerOrders(whatsapp: string) {
+  const db = await getDb(); if (!db) return [];
+  const sellers = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1);
+  if (!sellers[0]) return [];
+  const rows = await db.select({ order: orders, item: orderItems, productName: products.name, productPrice: products.price })
+    .from(orderItems)
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .innerJoin(products, eq(orderItems.productId, products.id))
+    .where(eq(products.sellerId, sellers[0].id))
+    .orderBy(desc(orders.createdAt));
+  const grouped = new Map<number, { order: typeof rows[number]["order"]; items: { name: string; price: number; quantity: number }[] }>();
+  for (const row of rows) {
+    const current = grouped.get(row.order.id) ?? { order: row.order, items: [] };
+    current.items.push({ name: row.productName, price: row.productPrice, quantity: row.item.quantity });
+    grouped.set(row.order.id, current);
+  }
+  return Array.from(grouped.values()).map(({ order, items }) => ({ ...order, items, sellerName: sellers[0].shopName }));
+}
+
 export async function getShippingSettings() {
   const db = await getDb();
   if (!db) return { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901", supportOpeningTime: "08:00", supportClosingTime: "20:00" };
