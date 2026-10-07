@@ -2,7 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { ENV } from "./_core/env";
-import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, userAccounts, users, visitorStats } from "../drizzle/schema";
+import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, supportTickets, userAccounts, users, visitorStats } from "../drizzle/schema";
 
 let _pool: Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -52,17 +52,34 @@ export async function listSellerProducts(whatsapp: string) {
 
 export async function getShippingSettings() {
   const db = await getDb();
-  if (!db) return { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901" };
+  if (!db) return { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901", supportOpeningTime: "08:00", supportClosingTime: "20:00" };
   const rows = await db.select().from(shippingSettings).where(eq(shippingSettings.id, 1)).limit(1);
   const settings = rows[0];
-  return settings ? { ratePerKm: settings.ratePerKm, discountPercent: settings.discountPercent, originLatitude: settings.originLatitude, originLongitude: settings.originLongitude, adminWhatsapp: settings.adminWhatsapp } : { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901" };
+  return settings ? { ratePerKm: settings.ratePerKm, discountPercent: settings.discountPercent, originLatitude: settings.originLatitude, originLongitude: settings.originLongitude, adminWhatsapp: settings.adminWhatsapp, supportOpeningTime: settings.supportOpeningTime, supportClosingTime: settings.supportClosingTime } : { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901", supportOpeningTime: "08:00", supportClosingTime: "20:00" };
 }
 
-export async function saveShippingSettings(input: { ratePerKm: number; discountPercent: number; originLatitude: string; originLongitude: string; adminWhatsapp: string }) {
+export async function saveShippingSettings(input: { ratePerKm: number; discountPercent: number; originLatitude: string; originLongitude: string; adminWhatsapp: string; supportOpeningTime: string; supportClosingTime: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database belum tersedia.");
   await db.insert(shippingSettings).values({ id: 1, ...input }).onConflictDoUpdate({ target: shippingSettings.id, set: { ...input, updatedAt: new Date() } });
   return getShippingSettings();
+}
+
+export async function createSupportTicket(input: { ticketCode: string; customerName: string; whatsapp: string; context: string; message: string }) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  const rows = await db.insert(supportTickets).values({ ...input, status: "open" }).returning();
+  return rows[0];
+}
+
+export async function listSupportTickets() {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(supportTickets).orderBy(desc(supportTickets.createdAt)).limit(100);
+}
+
+export async function updateSupportTicketStatus(id: number, status: "open" | "in_progress" | "resolved") {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  const rows = await db.update(supportTickets).set({ status, updatedAt: new Date() }).where(eq(supportTickets.id, id)).returning();
+  return rows[0] ?? null;
 }
 
 export async function getBuyerProfile(whatsapp: string) {

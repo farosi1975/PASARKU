@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerProducts, recordVisitorVisit, resetMarketplaceData, saveShippingSettings, getShippingSettings, upsertAccountRole } from "./db";
+import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listAdminProfiles, listApprovedProducts, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, saveShippingSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -189,6 +189,10 @@ export const appRouter = router({
       return { freeShipping: input.freeShipping } as const;
     }),
     shippingSettings: publicProcedure.query(() => getShippingSettings()),
+    createSupportTicket: publicProcedure.input(z.object({ customerName: z.string().min(2).max(160), whatsapp: phone, context: z.string().min(2).max(180), message: z.string().min(3).max(2000) })).mutation(async ({ input }) => {
+      const ticketCode = `TKT-${Date.now()}-${randomInt(100, 1000)}`;
+      return createSupportTicket({ ticketCode, customerName: input.customerName.trim(), whatsapp: normalizePhone(input.whatsapp), context: input.context.trim(), message: input.message.trim() });
+    }),
 
     sellerProducts: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => listSellerProducts(input.whatsapp)),
     sellerCouriers: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
@@ -325,7 +329,9 @@ export const appRouter = router({
     orders: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listOrders(); }),
     dashboardStats: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getDashboardStats(); }),
     adminShippingSettings: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getShippingSettings(); }),
-    updateShippingSettings: publicProcedure.input(z.object({ sessionToken: adminSessionToken, ratePerKm: z.number().int().min(0).max(1000000), discountPercent: z.number().int().min(0).max(100), originLatitude: z.string().regex(/^-?\d+(?:\.\d+)?$/), originLongitude: z.string().regex(/^-?\d+(?:\.\d+)?$/), adminWhatsapp: phone })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const latitude = Number(input.originLatitude); const longitude = Number(input.originLongitude); const adminWhatsapp = normalizePhone(input.adminWhatsapp); if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) throw new TRPCError({ code: "BAD_REQUEST", message: "Koordinat titik pusat tidak valid." }); return saveShippingSettings({ ratePerKm: input.ratePerKm, discountPercent: input.discountPercent, originLatitude: input.originLatitude, originLongitude: input.originLongitude, adminWhatsapp }); }),
+    updateShippingSettings: publicProcedure.input(z.object({ sessionToken: adminSessionToken, ratePerKm: z.number().int().min(0).max(1000000), discountPercent: z.number().int().min(0).max(100), originLatitude: z.string().regex(/^-?\d+(?:\.\d+)?$/), originLongitude: z.string().regex(/^-?\d+(?:\.\d+)?$/), adminWhatsapp: phone, supportOpeningTime: z.string().regex(/^\d{2}:\d{2}$/), supportClosingTime: z.string().regex(/^\d{2}:\d{2}$/) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const latitude = Number(input.originLatitude); const longitude = Number(input.originLongitude); const adminWhatsapp = normalizePhone(input.adminWhatsapp); if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) throw new TRPCError({ code: "BAD_REQUEST", message: "Koordinat titik pusat tidak valid." }); return saveShippingSettings({ ratePerKm: input.ratePerKm, discountPercent: input.discountPercent, originLatitude: input.originLatitude, originLongitude: input.originLongitude, adminWhatsapp, supportOpeningTime: input.supportOpeningTime, supportClosingTime: input.supportClosingTime }); }),
+    supportTickets: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listSupportTickets(); }),
+    updateSupportTicket: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), status: z.enum(["open", "in_progress", "resolved"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return updateSupportTicketStatus(input.id, input.status); }),
     couriers: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listCouriers(); }),
     userDirectory: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getAdminUserDirectory(); }),
     resetNonAdminData: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return resetMarketplaceData(); }),

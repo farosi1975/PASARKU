@@ -999,3 +999,22 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .help-admin-button:hover { background: #d5f0df; transform: translateY(-1px); }
 .help-admin-button.compact { min-height: 36px; padding: 0 12px; font-size: 12px; }
 @media (max-width: 760px) { .help-admin-button.compact { padding: 0 9px; } .help-admin-button.compact svg { display: none; } }
+
+.help-admin-wrap { position: relative; display: inline-flex; }
+.help-admin-popover { position: absolute; z-index: 40; top: calc(100% + 10px); right: 0; width: min(340px, calc(100vw - 32px)); padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: #fffaf5; box-shadow: 0 18px 45px rgba(82, 47, 28, .18); }
+.help-admin-popover-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
+.help-admin-popover-head strong, .help-admin-popover-head small { display: block; }
+.help-admin-popover-head small { margin-top: 3px; color: #806e63; font-size: 12px; line-height: 1.4; }
+.help-admin-popover-head button { border: 0; background: transparent; color: #806e63; cursor: pointer; }
+.help-admin-form { display: grid; gap: 8px; }
+.help-admin-form input, .help-admin-form textarea { width: 100%; border: 1px solid #e5d6c9; border-radius: 10px; padding: 10px 11px; background: #fff; color: #30231d; font: inherit; }
+.help-admin-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.help-admin-actions .primary-button, .help-admin-actions .outline-button { min-height: 36px; padding: 8px 12px; font-size: 12px; }
+.support-tickets-panel { margin: 18px 0; padding: 20px; border: 1px solid #eadfd4; border-radius: 18px; background: #fffaf5; }
+.support-ticket-list { display: grid; gap: 10px; }
+.support-ticket-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 13px 0; border-top: 1px solid #eee2d8; }
+.support-ticket-row strong, .support-ticket-row small { display: block; }
+.support-ticket-row small { margin-top: 4px; color: #806e63; font-size: 12px; }
+.support-ticket-row p { margin: 7px 0 0; color: #4f4037; font-size: 13px; white-space: pre-wrap; }
+.support-ticket-row select { min-width: 120px; border: 1px solid #e5d6c9; border-radius: 9px; padding: 8px; background: #fff; color: #4f4037; }
+@media (max-width: 640px) { .help-admin-popover { right: -8px; } .support-ticket-row { flex-direction: column; } }

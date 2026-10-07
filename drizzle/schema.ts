@@ -70,6 +70,22 @@ export const shippingSettings = pgTable("shipping_settings", {
   originLatitude: varchar("originLatitude", { length: 32 }).default("-7.602345").notNull(),
   originLongitude: varchar("originLongitude", { length: 32 }).default("111.904321").notNull(),
   adminWhatsapp: varchar("adminWhatsapp", { length: 32 }).default("6281456015901").notNull(),
+  supportOpeningTime: varchar("supportOpeningTime", { length: 5 }).default("08:00").notNull(),
+  supportClosingTime: varchar("supportClosingTime", { length: 5 }).default("20:00").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export const supportTicketStatusEnum = pgEnum("support_ticket_status", ["open", "in_progress", "resolved"]);
+
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  ticketCode: varchar("ticketCode", { length: 32 }).notNull().unique(),
+  customerName: varchar("customerName", { length: 160 }).notNull(),
+  whatsapp: varchar("whatsapp", { length: 32 }).notNull(),
+  context: varchar("context", { length: 180 }).notNull(),
+  message: text("message").notNull(),
+  status: supportTicketStatusEnum("status").default("open").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
@@ -158,3 +174,4 @@ export type AdminProfile = typeof adminProfiles.$inferSelect;
 export type UserAccount = typeof userAccounts.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
+export type SupportTicket = typeof supportTickets.$inferSelect;
