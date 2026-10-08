@@ -57,6 +57,13 @@
       "when": 1791437416106,
       "tag": "0007_needy_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791439353622,
+      "tag": "0008_orange_norrin_radd",
+      "breakpoints": true
     }
   ]
 }
