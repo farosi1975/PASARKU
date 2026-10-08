@@ -42,6 +42,16 @@ const uploadProductImage = async (whatsapp: string, imageData?: string) => {
   const stored = await storagePut(`pasarku/products/${whatsapp}.${extension}`, buffer, match[1]);
   return stored.url;
 };
+const uploadIdentityPhoto = async (whatsapp: string, kind: "identity" | "selfie", imageData?: string) => {
+  if (!imageData) return null;
+  const match = imageData.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
+  if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "Foto identitas harus berupa JPG, PNG, atau WebP." });
+  const buffer = Buffer.from(match[2], "base64");
+  if (buffer.length > 3 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "Ukuran setiap foto identitas maksimal 3 MB." });
+  const extension = match[1].split("/")[1].replace("jpeg", "jpg");
+  const stored = await storagePut(`pasarku/identity/${whatsapp}/${kind}.${extension}`, buffer, match[1]);
+  return stored.url;
+};
 const invalidOtp = (challenge: { attempts: number }, message: string) => {
   challenge.attempts += 1;
   return new TRPCError({ code: "UNAUTHORIZED", message: challenge.attempts >= OTP_MAX_ATTEMPTS ? "Batas 5 percobaan tercapai. Minta OTP baru setelah cooldown." : `${message} Percobaan tersisa ${OTP_MAX_ATTEMPTS - challenge.attempts}.` });
@@ -74,6 +84,16 @@ const notifyCourierAssignment = async (target: string, orderCode: string, total:
     return { sent: true as const };
   } catch (error) {
     console.error("[FONNTE] Notifikasi assignment kurir gagal:", error instanceof Error ? error.message : error);
+    return { sent: false as const };
+  }
+};
+const notifyAdminNewOrder = async (target: string, orderCode: string, customerName: string, village: string, total: number) => {
+  const message = `PASARKU: Pesanan baru ${orderCode} dari ${customerName}, Desa ${village}. Total COD: Rp${total.toLocaleString("id-ID")}. Silakan buka panel Admin untuk memproses pesanan.`;
+  try {
+    await sendFonnteMessage(target, message);
+    return { sent: true as const };
+  } catch (error) {
+    console.error("[FONNTE] Notifikasi pesanan baru ke Admin gagal:", error instanceof Error ? error.message : error);
     return { sent: false as const };
   }
 };
@@ -157,7 +177,7 @@ export const appRouter = router({
     }),
     sellerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
       const db = await dbRequired();
-      const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      const rows = await db.select({ id: sellerProfiles.id, shopName: sellerProfiles.shopName, ownerName: sellerProfiles.ownerName, whatsapp: sellerProfiles.whatsapp, village: sellerProfiles.village, currentLocation: sellerProfiles.currentLocation, openingTime: sellerProfiles.openingTime, closingTime: sellerProfiles.closingTime, preferredCourierId: sellerProfiles.preferredCourierId, isOpen: sellerProfiles.isOpen, freeShipping: sellerProfiles.freeShipping, verificationStatus: sellerProfiles.verificationStatus, isBanned: sellerProfiles.isBanned, verifiedAt: sellerProfiles.verifiedAt }).from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
       return rows[0] ?? null;
     }),
     setSellerOpen: publicProcedure.input(z.object({ whatsapp: phone, isOpen: z.boolean() })).mutation(async ({ input }) => {
@@ -228,9 +248,11 @@ export const appRouter = router({
       const db = await dbRequired(); await db.insert(sellerProfiles).values({ shopName: challenge.shopName, ownerName: challenge.ownerName, whatsapp, village: challenge.village, verificationStatus: "verified", verifiedAt: new Date() }).onConflictDoUpdate({ target: sellerProfiles.whatsapp, set: { shopName: challenge.shopName, ownerName: challenge.ownerName, village: challenge.village, verificationStatus: "verified", verifiedAt: new Date() } });
       sellerChallenges.delete(whatsapp); const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); await upsertAccountRole(whatsapp, "seller", challenge.ownerName); return rows[0];
     }),
-    registerSeller: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2) })).mutation(async ({ input }) => {
+    registerSeller: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), identityPhotoData: z.string().optional(), selfiePhotoData: z.string().optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existing = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); if (existing[0]?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun toko ini diblokir oleh Admin PASARKU." });
-      await db.insert(sellerProfiles).values({ shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), whatsapp, village: input.village, verificationStatus: "pending", verifiedAt: null }).onConflictDoUpdate({ target: sellerProfiles.whatsapp, set: { shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, verificationStatus: "pending", verifiedAt: null, updatedAt: new Date() } });
+      if (!input.identityPhotoData || !input.selfiePhotoData) throw new TRPCError({ code: "BAD_REQUEST", message: "Foto KTP/identitas dan selfie wajib diunggah untuk verifikasi Admin." });
+      const identityPhotoUrl = await uploadIdentityPhoto(whatsapp, "identity", input.identityPhotoData); const selfiePhotoUrl = await uploadIdentityPhoto(whatsapp, "selfie", input.selfiePhotoData);
+      await db.insert(sellerProfiles).values({ shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), whatsapp, identityPhotoUrl, selfiePhotoUrl, village: input.village, verificationStatus: "pending", verifiedAt: null }).onConflictDoUpdate({ target: sellerProfiles.whatsapp, set: { shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, ...(identityPhotoUrl ? { identityPhotoUrl } : {}), ...(selfiePhotoUrl ? { selfiePhotoUrl } : {}), verificationStatus: "pending", verifiedAt: null, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "seller", input.ownerName.trim());
       const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),
@@ -274,9 +296,11 @@ export const appRouter = router({
       const db = await dbRequired(); await db.insert(courierProfiles).values({ name: challenge.name, whatsapp, vehicle: challenge.vehicle, verificationStatus: "verified", verifiedAt: new Date() }).onConflictDoUpdate({ target: courierProfiles.whatsapp, set: { name: challenge.name, vehicle: challenge.vehicle, verificationStatus: "verified", verifiedAt: new Date() } });
       courierChallenges.delete(whatsapp); const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); await upsertAccountRole(whatsapp, "courier", challenge.name); return rows[0];
     }),
-    registerCourier: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, vehicle: z.string().min(2), village: z.string().min(2).default("Sawahan"), address: z.string().optional() })).mutation(async ({ input }) => {
+    registerCourier: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, vehicle: z.string().min(2), village: z.string().min(2).default("Sawahan"), address: z.string().optional(), identityPhotoData: z.string().optional(), selfiePhotoData: z.string().optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existing = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); if (existing[0]?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun kurir ini diblokir oleh Admin PASARKU." });
-      await db.insert(courierProfiles).values({ name: input.name.trim(), whatsapp, vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, verificationStatus: "pending", verifiedAt: null }).onConflictDoUpdate({ target: courierProfiles.whatsapp, set: { name: input.name.trim(), vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, verificationStatus: "pending", verifiedAt: null, updatedAt: new Date() } });
+      if (!input.identityPhotoData || !input.selfiePhotoData) throw new TRPCError({ code: "BAD_REQUEST", message: "Foto KTP/identitas dan selfie wajib diunggah untuk verifikasi Admin." });
+      const identityPhotoUrl = await uploadIdentityPhoto(whatsapp, "identity", input.identityPhotoData); const selfiePhotoUrl = await uploadIdentityPhoto(whatsapp, "selfie", input.selfiePhotoData);
+      await db.insert(courierProfiles).values({ name: input.name.trim(), whatsapp, identityPhotoUrl, selfiePhotoUrl, vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, verificationStatus: "pending", verifiedAt: null }).onConflictDoUpdate({ target: courierProfiles.whatsapp, set: { name: input.name.trim(), vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, ...(identityPhotoUrl ? { identityPhotoUrl } : {}), ...(selfiePhotoUrl ? { selfiePhotoUrl } : {}), verificationStatus: "pending", verifiedAt: null, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "courier", input.name.trim());
       const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),
@@ -324,6 +348,8 @@ export const appRouter = router({
           }
         }
       }
+      const adminSettings = await getShippingSettings();
+      void notifyAdminNewOrder(adminSettings.adminWhatsapp, orderCode, input.customerName, input.village, calculatedTotal);
       if (assignedCourier) void notifyCourierAssignment(assignedCourier.whatsapp, orderCode, calculatedTotal, "otomatis");
       return getOrderWithItems(orderCode);
     }),
@@ -357,7 +383,7 @@ export const appRouter = router({
     approveCourier: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), status: z.enum(["verified", "rejected"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.id, input.id)).limit(1); const courier = rows[0]; if (!courier) throw new TRPCError({ code: "NOT_FOUND", message: "Pendaftaran kurir tidak ditemukan." }); await db.update(courierProfiles).set({ verificationStatus: input.status, isBanned: 0, verifiedAt: input.status === "verified" ? new Date() : null }).where(eq(courierProfiles.id, input.id)); const notification = await notifyVerificationResult(courier.whatsapp, "courier", input.status, courier.name); return { success: true as const, notificationSent: notification.sent }; }),
     courierProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
       const db = await dbRequired();
-      const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      const rows = await db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle, village: courierProfiles.village, address: courierProfiles.address, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned, verifiedAt: courierProfiles.verifiedAt }).from(courierProfiles).where(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
       return rows[0]?.verificationStatus === "verified" && !rows[0].isBanned ? rows[0] : null;
     }),
     order: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).query(({ input }) => getOrderWithItems(input.orderCode)),

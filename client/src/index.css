@@ -1083,3 +1083,8 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .print-sheet-stiker.print-size-80mm { min-height: 120mm; padding: 4mm; }
   .print-sheet-stiker.print-size-a4 { min-height: 120mm; padding: 5mm; }
 }
+
+.identity-photo-cell { display: flex; flex-direction: column; gap: 4px; min-width: 110px; }
+.identity-photo-cell a { color: var(--orange-dark); font-weight: 700; text-decoration: underline; }
+.identity-photo-cell span { color: var(--muted); font-size: 12px; }
+.seller-photo-picker small { display: block; margin-top: 5px; }
