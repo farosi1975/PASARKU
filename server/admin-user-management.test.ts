@@ -40,4 +40,24 @@ describe("admin marketplace user sheets", () => {
       action: "ban",
     })).rejects.toThrow(/sesi admin|admin/i);
   });
+
+  it("validates the document review role", async () => {
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.marketplace.reviewDocuments({
+      sessionToken: "invalid-session",
+      role: "buyer" as never,
+      id: 1,
+      reviewed: true,
+    })).rejects.toThrow();
+  });
+
+  it("requires an authenticated admin session for document review", async () => {
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.marketplace.reviewDocuments({
+      sessionToken: "x".repeat(32),
+      role: "seller",
+      id: 1,
+      reviewed: true,
+    })).rejects.toThrow(/sesi admin|admin/i);
+  });
 });

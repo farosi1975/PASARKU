@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { formatRupiah, mockOrders, type MockOrder, type OrderStatus } from "@/data/catalog";
 import { COURIER_SESSION_KEY, normalizeCourierPhone, type CourierProfile } from "@/lib/courier";
 import { trpc } from "@/lib/trpc";
+import { compressImageFile } from "@/lib/image";
 import { buildGoogleMapsDirectionsUrl, buildGoogleMapsUrl } from "@/lib/maps";
 import { SAWAHAN_VILLAGES } from "@/lib/locations";
 import { HelpAdminButton } from "@/components/HelpAdminButton";
@@ -21,7 +22,7 @@ export default function Courier() {
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [form, setForm] = useState({ name: "", phone: "", vehicle: "Motor", village: "Sawahan", address: "", identityPhotoData: "", selfiePhotoData: "" });
   const [otp, setOtp] = useState("");
-  const handleIdentityPhoto = (kind: "identityPhotoData" | "selfiePhotoData") => (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return toast.error("Pilih foto JPG, PNG, atau WebP."); if (file.size > 3 * 1024 * 1024) return toast.error("Ukuran foto identitas maksimal 3 MB."); const reader = new FileReader(); reader.onload = () => setForm((current) => ({ ...current, [kind]: String(reader.result || "") })); reader.readAsDataURL(file); };
+  const handleIdentityPhoto = (kind: "identityPhotoData" | "selfiePhotoData") => async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return toast.error("Pilih foto JPG, PNG, atau WebP."); if (file.size > 3 * 1024 * 1024) return toast.error("Ukuran foto identitas maksimal 3 MB."); try { const imageData = await compressImageFile(file, 1400, 700 * 1024); setForm((current) => ({ ...current, [kind]: imageData })); toast.success("Foto verifikasi dikompresi"); } catch (error) { toast.error("Foto verifikasi belum dapat diproses", { description: error instanceof Error ? error.message : "Coba foto lain." }); } };
   const [panel, setPanel] = useState<Panel>("tasks");
   const [orders, setOrders] = useState<MockOrder[]>(mockOrders);
   const [remoteOrders, setRemoteOrders] = useState<MockOrder[]>([]);

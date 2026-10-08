@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { SELLER_PRODUCTS_KEY, SELLER_SESSION_KEY, type SellerProduct, type SellerProfile, normalizeSellerPhone } from "@/lib/seller";
 import { SAWAHAN_VILLAGES } from "@/lib/locations";
 import { trpc } from "@/lib/trpc";
+import { compressImageFile } from "@/lib/image";
 import { HelpAdminButton } from "@/components/HelpAdminButton";
 import { OrderPrintActions } from "@/components/OrderPrintActions";
 
@@ -67,21 +68,21 @@ export default function Seller() {
 
   const logout = () => { window.localStorage.removeItem(SELLER_SESSION_KEY); setProfile(null); setPanel("products"); setAuthMode("login"); setProfileForm({ shopName: "", ownerName: "", phone: "", village: "Sawahan", identityPhotoData: "", selfiePhotoData: "" }); toast.success("Anda sudah keluar dari portal penjual."); };
 
-  const handlePhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhoto = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return toast.error("Pilih foto JPG, PNG, atau WebP.");
     if (file.size > 5 * 1024 * 1024) return toast.error("Ukuran foto maksimal 5 MB.");
-    const reader = new FileReader();
-    reader.onload = () => setProductForm((current) => ({ ...current, imageData: String(reader.result || "") }));
-    reader.readAsDataURL(file);
+    try { const imageData = await compressImageFile(file, 1600, 900 * 1024); setProductForm((current) => ({ ...current, imageData })); toast.success("Foto produk dikompresi", { description: "Upload akan lebih cepat dan hemat storage." }); }
+    catch (error) { toast.error("Foto belum dapat diproses", { description: error instanceof Error ? error.message : "Coba foto lain." }); }
   };
 
-  const handleIdentityPhoto = (kind: "identityPhotoData" | "selfiePhotoData") => (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleIdentityPhoto = (kind: "identityPhotoData" | "selfiePhotoData") => async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return;
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return toast.error("Pilih foto JPG, PNG, atau WebP.");
     if (file.size > 3 * 1024 * 1024) return toast.error("Ukuran foto identitas maksimal 3 MB.");
-    const reader = new FileReader(); reader.onload = () => setProfileForm((current) => ({ ...current, [kind]: String(reader.result || "") })); reader.readAsDataURL(file);
+    try { const imageData = await compressImageFile(file, 1400, 700 * 1024); setProfileForm((current) => ({ ...current, [kind]: imageData })); toast.success("Foto verifikasi dikompresi"); }
+    catch (error) { toast.error("Foto verifikasi belum dapat diproses", { description: error instanceof Error ? error.message : "Coba foto lain." }); }
   };
   const addProduct = async (event: React.FormEvent) => {
     event.preventDefault();

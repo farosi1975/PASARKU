@@ -43,6 +43,13 @@
       "when": 1791425456285,
       "tag": "0005_yellow_miek",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791425839200,
+      "tag": "0006_skinny_exodus",
+      "breakpoints": true
     }
   ]
 }
