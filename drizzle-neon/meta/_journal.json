@@ -50,6 +50,13 @@
       "when": 1791425839200,
       "tag": "0006_skinny_exodus",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791437416106,
+      "tag": "0007_needy_spirit",
+      "breakpoints": true
     }
   ]
 }

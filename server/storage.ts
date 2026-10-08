@@ -1,27 +1,34 @@
-// Preconfigured storage helpers for Manus WebDev templates
-// Uploads via Forge Server presigned URL to S3 (PUT direct).
-// Downloads return /manus-storage/{key} paths served via 307 redirect.
-
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ENV } from "./_core/env";
+
+export type StoragePutResult = { key: string; url: string | null };
 
 function getForgeConfig() {
   const forgeUrl = ENV.forgeApiUrl;
   const forgeKey = ENV.forgeApiKey;
-
   if (!forgeUrl || !forgeKey) {
-    throw new Error(
-      "Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY",
-    );
+    throw new Error("Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY");
   }
-
   return { forgeUrl: forgeUrl.replace(/\/+$/, ""), forgeKey };
 }
 
+function getR2Config() {
+  if (!ENV.r2Endpoint || !ENV.r2AccessKeyId || !ENV.r2SecretAccessKey || !ENV.r2Bucket) return null;
+  return {
+    client: new S3Client({
+      region: "auto",
+      endpoint: ENV.r2Endpoint,
+      forcePathStyle: true,
+      credentials: { accessKeyId: ENV.r2AccessKeyId, secretAccessKey: ENV.r2SecretAccessKey },
+    }),
+    bucket: ENV.r2Bucket,
+    publicBaseUrl: ENV.r2PublicBaseUrl.replace(/\/+$/, ""),
+  };
+}
+
 function buildInlineDataUrl(data: Buffer | Uint8Array | string, contentType: string): string {
-  const base64 = typeof data === "string"
-    ? Buffer.from(data).toString("base64")
-    : Buffer.from(data).toString("base64");
-  return `data:${contentType};base64,${base64}`;
+  return `data:${contentType};base64,${Buffer.from(data).toString("base64")}`;
 }
 
 function normalizeKey(relKey: string): string {
@@ -35,55 +42,44 @@ function appendHashSuffix(relKey: string): string {
   return `${relKey.slice(0, lastDot)}_${hash}${relKey.slice(lastDot)}`;
 }
 
-export async function storagePut(
-  relKey: string,
-  data: Buffer | Uint8Array | string,
-  contentType = "application/octet-stream",
-): Promise<{ key: string; url: string }> {
-  const key = appendHashSuffix(normalizeKey(relKey));
+async function putToR2(key: string, data: Buffer | Uint8Array | string, contentType: string, requirePublicUrl: boolean): Promise<StoragePutResult | null> {
+  const r2 = getR2Config();
+  if (!r2 || (requirePublicUrl && !r2.publicBaseUrl)) return null;
+  await r2.client.send(new PutObjectCommand({ Bucket: r2.bucket, Key: key, Body: data, ContentType: contentType }));
+  return { key, url: r2.publicBaseUrl ? `${r2.publicBaseUrl}/${key}` : null };
+}
 
-  // Render does not receive Manus' BUILT_IN_FORGE_* variables. For product
-  // photos, keep a durable MVP fallback in Neon instead of failing the whole
-  // product save. The products.imageUrl column is text and Neon is persistent.
+export async function storagePut(relKey: string, data: Buffer | Uint8Array | string, contentType = "application/octet-stream"): Promise<{ key: string; url: string }> {
+  const key = appendHashSuffix(normalizeKey(relKey));
+  const r2Result = await putToR2(key, data, contentType, true);
+  if (r2Result?.url) return { key: r2Result.key, url: r2Result.url };
+
   if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
     return { key, url: buildInlineDataUrl(data, contentType) };
   }
 
   const { forgeUrl, forgeKey } = getForgeConfig();
-
-  // 1. Get presigned PUT URL from Forge
   const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
   presignUrl.searchParams.set("path", key);
-
-  const presignResp = await fetch(presignUrl, {
-    headers: { Authorization: `Bearer ${forgeKey}` },
-  });
-
+  const presignResp = await fetch(presignUrl, { headers: { Authorization: `Bearer ${forgeKey}` } });
   if (!presignResp.ok) {
     const msg = await presignResp.text().catch(() => presignResp.statusText);
     throw new Error(`Storage presign failed (${presignResp.status}): ${msg}`);
   }
-
   const { url: s3Url } = (await presignResp.json()) as { url: string };
   if (!s3Url) throw new Error("Forge returned empty presign URL");
-
-  // 2. PUT file directly to S3
-  const blob =
-    typeof data === "string"
-      ? new Blob([data], { type: contentType })
-      : new Blob([data as any], { type: contentType });
-
-  const uploadResp = await fetch(s3Url, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: blob,
-  });
-
-  if (!uploadResp.ok) {
-    throw new Error(`Storage upload to S3 failed (${uploadResp.status})`);
-  }
-
+  const uploadResp = await fetch(s3Url, { method: "PUT", headers: { "Content-Type": contentType }, body: new Blob([data as any], { type: contentType }) });
+  if (!uploadResp.ok) throw new Error(`Storage upload to S3 failed (${uploadResp.status})`);
   return { key, url: `/manus-storage/${key}` };
+}
+
+/** Uploads a document to a private R2 bucket. The database should store the key, not a public URL. */
+export async function storagePutPrivate(relKey: string, data: Buffer | Uint8Array | string, contentType = "application/octet-stream"): Promise<StoragePutResult> {
+  const key = appendHashSuffix(normalizeKey(relKey));
+  const r2Result = await putToR2(key, data, contentType, false);
+  if (r2Result) return r2Result;
+  const legacy = await storagePut(relKey, data, contentType);
+  return { key: legacy.key, url: legacy.url };
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
@@ -92,21 +88,18 @@ export async function storageGet(relKey: string): Promise<{ key: string; url: st
 }
 
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
   const key = normalizeKey(relKey);
+  const r2 = getR2Config();
+  if (r2) return getSignedUrl(r2.client, new GetObjectCommand({ Bucket: r2.bucket, Key: key }), { expiresIn: 300 });
 
+  const { forgeUrl, forgeKey } = getForgeConfig();
   const getUrl = new URL("v1/storage/presign/get", forgeUrl + "/");
   getUrl.searchParams.set("path", key);
-
-  const resp = await fetch(getUrl, {
-    headers: { Authorization: `Bearer ${forgeKey}` },
-  });
-
+  const resp = await fetch(getUrl, { headers: { Authorization: `Bearer ${forgeKey}` } });
   if (!resp.ok) {
     const msg = await resp.text().catch(() => resp.statusText);
     throw new Error(`Storage signed URL failed (${resp.status}): ${msg}`);
   }
-
   const { url } = (await resp.json()) as { url: string };
   return url;
 }

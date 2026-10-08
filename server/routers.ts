@@ -9,7 +9,7 @@ import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, prod
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendFonnteMessage } from "./fonnte";
-import { storagePut } from "./storage";
+import { storageGetSignedUrl, storagePut, storagePutPrivate } from "./storage";
 import { calculateShippingCost, parseCoordinates } from "../shared/shipping";
 
 const phone = z.string().min(10).max(32);
@@ -49,8 +49,7 @@ const uploadIdentityPhoto = async (whatsapp: string, kind: "identity" | "selfie"
   const buffer = Buffer.from(match[2], "base64");
   if (buffer.length > 3 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "Ukuran setiap foto identitas maksimal 3 MB." });
   const extension = match[1].split("/")[1].replace("jpeg", "jpg");
-  const stored = await storagePut(`pasarku/identity/${whatsapp}/${kind}.${extension}`, buffer, match[1]);
-  return stored.url;
+  return storagePutPrivate(`pasarku/identity/${whatsapp}/${kind}.${extension}`, buffer, match[1]);
 };
 const invalidOtp = (challenge: { attempts: number }, message: string) => {
   challenge.attempts += 1;
@@ -251,8 +250,9 @@ export const appRouter = router({
     registerSeller: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), identityPhotoData: z.string().optional(), selfiePhotoData: z.string().optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existing = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); if (existing[0]?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun toko ini diblokir oleh Admin PASARKU." });
       if (!input.identityPhotoData || !input.selfiePhotoData) throw new TRPCError({ code: "BAD_REQUEST", message: "Foto KTP/identitas dan selfie wajib diunggah untuk verifikasi Admin." });
-      const identityPhotoUrl = await uploadIdentityPhoto(whatsapp, "identity", input.identityPhotoData); const selfiePhotoUrl = await uploadIdentityPhoto(whatsapp, "selfie", input.selfiePhotoData);
-      await db.insert(sellerProfiles).values({ shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), whatsapp, identityPhotoUrl, selfiePhotoUrl, village: input.village, verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null }).onConflictDoUpdate({ target: sellerProfiles.whatsapp, set: { shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, ...(identityPhotoUrl ? { identityPhotoUrl } : {}), ...(selfiePhotoUrl ? { selfiePhotoUrl } : {}), verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null, updatedAt: new Date() } });
+      const identityPhoto = await uploadIdentityPhoto(whatsapp, "identity", input.identityPhotoData); const selfiePhoto = await uploadIdentityPhoto(whatsapp, "selfie", input.selfiePhotoData);
+      const identityPhotoUrl = identityPhoto?.url ?? null; const selfiePhotoUrl = selfiePhoto?.url ?? null; const identityPhotoKey = identityPhoto?.key ?? null; const selfiePhotoKey = selfiePhoto?.key ?? null;
+      await db.insert(sellerProfiles).values({ shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), whatsapp, identityPhotoUrl, selfiePhotoUrl, identityPhotoKey, selfiePhotoKey, village: input.village, verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null }).onConflictDoUpdate({ target: sellerProfiles.whatsapp, set: { shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, identityPhotoUrl, selfiePhotoUrl, identityPhotoKey, selfiePhotoKey, verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "seller", input.ownerName.trim());
       const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),
@@ -299,8 +299,9 @@ export const appRouter = router({
     registerCourier: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, vehicle: z.string().min(2), village: z.string().min(2).default("Sawahan"), address: z.string().optional(), identityPhotoData: z.string().optional(), selfiePhotoData: z.string().optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existing = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); if (existing[0]?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun kurir ini diblokir oleh Admin PASARKU." });
       if (!input.identityPhotoData || !input.selfiePhotoData) throw new TRPCError({ code: "BAD_REQUEST", message: "Foto KTP/identitas dan selfie wajib diunggah untuk verifikasi Admin." });
-      const identityPhotoUrl = await uploadIdentityPhoto(whatsapp, "identity", input.identityPhotoData); const selfiePhotoUrl = await uploadIdentityPhoto(whatsapp, "selfie", input.selfiePhotoData);
-      await db.insert(courierProfiles).values({ name: input.name.trim(), whatsapp, identityPhotoUrl, selfiePhotoUrl, vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null }).onConflictDoUpdate({ target: courierProfiles.whatsapp, set: { name: input.name.trim(), vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, ...(identityPhotoUrl ? { identityPhotoUrl } : {}), ...(selfiePhotoUrl ? { selfiePhotoUrl } : {}), verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null, updatedAt: new Date() } });
+      const identityPhoto = await uploadIdentityPhoto(whatsapp, "identity", input.identityPhotoData); const selfiePhoto = await uploadIdentityPhoto(whatsapp, "selfie", input.selfiePhotoData);
+      const identityPhotoUrl = identityPhoto?.url ?? null; const selfiePhotoUrl = selfiePhoto?.url ?? null; const identityPhotoKey = identityPhoto?.key ?? null; const selfiePhotoKey = selfiePhoto?.key ?? null;
+      await db.insert(courierProfiles).values({ name: input.name.trim(), whatsapp, identityPhotoUrl, selfiePhotoUrl, identityPhotoKey, selfiePhotoKey, vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null }).onConflictDoUpdate({ target: courierProfiles.whatsapp, set: { name: input.name.trim(), vehicle: input.vehicle, village: input.village, address: input.address?.trim() || null, identityPhotoUrl, selfiePhotoUrl, identityPhotoKey, selfiePhotoKey, verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "courier", input.name.trim());
       const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),
@@ -361,6 +362,22 @@ export const appRouter = router({
     updateSupportTicket: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), status: z.enum(["open", "in_progress", "resolved"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return updateSupportTicketStatus(input.id, input.status); }),
     couriers: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listCouriers(); }),
     userDirectory: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getAdminUserDirectory(); }),
+    adminPhotoUrl: publicProcedure.input(z.object({ sessionToken: adminSessionToken, role: z.enum(["seller", "courier"]), id: z.number().int().positive(), kind: z.enum(["identity", "selfie"]) })).query(async ({ input }) => {
+      await requireAdminSession(input.sessionToken);
+      const db = await dbRequired();
+      if (input.role === "seller") {
+        const row = await db.select().from(sellerProfiles).where(eq(sellerProfiles.id, input.id)).limit(1);
+        if (!row[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Profil penjual tidak ditemukan." });
+        const key = input.kind === "identity" ? row[0].identityPhotoKey : row[0].selfiePhotoKey;
+        const legacyUrl = input.kind === "identity" ? row[0].identityPhotoUrl : row[0].selfiePhotoUrl;
+        return { url: key ? await storageGetSignedUrl(key) : legacyUrl };
+      }
+      const row = await db.select().from(courierProfiles).where(eq(courierProfiles.id, input.id)).limit(1);
+      if (!row[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Profil kurir tidak ditemukan." });
+      const key = input.kind === "identity" ? row[0].identityPhotoKey : row[0].selfiePhotoKey;
+      const legacyUrl = input.kind === "identity" ? row[0].identityPhotoUrl : row[0].selfiePhotoUrl;
+      return { url: key ? await storageGetSignedUrl(key) : legacyUrl };
+    }),
     resetNonAdminData: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return resetMarketplaceData(); }),
     manageUserAccess: publicProcedure.input(z.object({ sessionToken: adminSessionToken, role: z.enum(["buyer", "seller", "courier"]), id: z.number().int().positive(), action: z.enum(["ban", "unban"]) })).mutation(async ({ input }) => {
       await requireAdminSession(input.sessionToken);
