@@ -71,6 +71,13 @@
       "when": 1791440155945,
       "tag": "0009_fuzzy_felicia_hardy",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791442181024,
+      "tag": "0010_huge_skaar",
+      "breakpoints": true
     }
   ]
 }

@@ -84,7 +84,7 @@ export async function saveShippingSettings(input: { ratePerKm: number; discountP
   return getShippingSettings();
 }
 
-const DEFAULT_SITE_SETTINGS = { id: 1, brandName: "PASARKU", tagline: "Belanja dekat, berdampak hebat.", heroTitle: "Belanja dekat,", heroHighlight: "berdampak hebat.", heroDescription: "Temukan produk dan jasa dari tetangga sendiri.", promoTitle: "Promo warga Sawahan", promoDescription: "Temukan penawaran terbaru dari toko lokal.", promoCta: "Jelajahi sekarang", promoActive: 1, promoColor: "orange" };
+const DEFAULT_SITE_SETTINGS = { id: 1, brandName: "PASARKU", tagline: "Belanja dekat, berdampak hebat.", heroTitle: "Belanja dekat,", heroHighlight: "berdampak hebat.", heroDescription: "Temukan produk dan jasa dari tetangga sendiri.", promoTitle: "Promo warga Sawahan", promoDescription: "Temukan penawaran terbaru dari toko lokal.", promoCta: "Jelajahi sekarang", promoActive: 1, promoColor: "orange", logoUrl: null as string | null, bannerImageUrl: null as string | null, promoStartsAt: null as Date | null, promoEndsAt: null as Date | null };
 
 export async function getSiteSettings() {
   const db = await getDb(); if (!db) return DEFAULT_SITE_SETTINGS;
@@ -92,9 +92,11 @@ export async function getSiteSettings() {
   return rows[0] ?? DEFAULT_SITE_SETTINGS;
 }
 
-export async function saveSiteSettings(input: Omit<typeof DEFAULT_SITE_SETTINGS, "id">) {
+export async function saveSiteSettings(input: Partial<Omit<typeof DEFAULT_SITE_SETTINGS, "id">> & Pick<typeof DEFAULT_SITE_SETTINGS, "brandName" | "tagline" | "heroTitle" | "heroHighlight" | "heroDescription" | "promoTitle" | "promoDescription" | "promoCta" | "promoActive" | "promoColor">) {
   const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
-  await db.insert(siteSettings).values({ id: 1, ...input }).onConflictDoUpdate({ target: siteSettings.id, set: { ...input, updatedAt: new Date() } });
+  const current = await getSiteSettings();
+  const { id: _id, ...values } = { ...current, ...input };
+  await db.insert(siteSettings).values({ id: 1, ...values }).onConflictDoUpdate({ target: siteSettings.id, set: { ...values, updatedAt: new Date() } });
   return getSiteSettings();
 }
 

@@ -1120,3 +1120,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .branding-switch { display: flex !important; align-items: center; gap: 8px; align-self: end; min-height: 38px; }
 .branding-switch input { accent-color: var(--orange); }
 @media (max-width: 620px) { .promo-inner { align-items: flex-start; flex-direction: column; } .admin-branding-form { grid-template-columns: 1fr; } .admin-branding-form .wide-field, .admin-branding-form .primary-button { grid-column: auto; } }
+
+.branding-preview-logo { width: 58px; height: 58px; object-fit: contain; border-radius: 10px; border: 1px solid #eadfd5; background: #fff; padding: 5px; }
+.branding-preview-banner { width: 100%; max-height: 84px; object-fit: cover; border-radius: 9px; border: 1px solid #eadfd5; }
+.admin-branding-form input[type=file] { padding: 7px; font-size: 10px; }

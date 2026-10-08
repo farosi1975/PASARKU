@@ -101,6 +101,10 @@ export const siteSettings = pgTable("site_settings", {
   promoCta: varchar("promoCta", { length: 80 }).default("Jelajahi sekarang").notNull(),
   promoActive: integer("promoActive").default(1).notNull(),
   promoColor: varchar("promoColor", { length: 20 }).default("orange").notNull(),
+  logoUrl: text("logoUrl"),
+  bannerImageUrl: text("bannerImageUrl"),
+  promoStartsAt: timestamp("promoStartsAt"),
+  promoEndsAt: timestamp("promoEndsAt"),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
