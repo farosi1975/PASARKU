@@ -78,6 +78,13 @@
       "when": 1791442181024,
       "tag": "0010_huge_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791445071372,
+      "tag": "0011_gifted_spectrum",
+      "breakpoints": true
     }
   ]
 }

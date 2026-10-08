@@ -105,6 +105,7 @@ export const siteSettings = pgTable("site_settings", {
   bannerImageUrl: text("bannerImageUrl"),
   promoStartsAt: timestamp("promoStartsAt"),
   promoEndsAt: timestamp("promoEndsAt"),
+  promoSlots: text("promoSlots"),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 

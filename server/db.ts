@@ -84,7 +84,8 @@ export async function saveShippingSettings(input: { ratePerKm: number; discountP
   return getShippingSettings();
 }
 
-const DEFAULT_SITE_SETTINGS = { id: 1, brandName: "PASARKU", tagline: "Belanja dekat, berdampak hebat.", heroTitle: "Belanja dekat,", heroHighlight: "berdampak hebat.", heroDescription: "Temukan produk dan jasa dari tetangga sendiri.", promoTitle: "Promo warga Sawahan", promoDescription: "Temukan penawaran terbaru dari toko lokal.", promoCta: "Jelajahi sekarang", promoActive: 1, promoColor: "orange", logoUrl: null as string | null, bannerImageUrl: null as string | null, promoStartsAt: null as Date | null, promoEndsAt: null as Date | null };
+const DEFAULT_PROMO_SLOTS = JSON.stringify([{ id: "promo-1", title: "Promo warga Sawahan", description: "Temukan penawaran terbaru dari toko lokal.", cta: "Jelajahi sekarang", color: "orange", active: true, startsAt: null, endsAt: null, bannerImageUrl: null }]);
+const DEFAULT_SITE_SETTINGS = { id: 1, brandName: "PASARKU", tagline: "Belanja dekat, berdampak hebat.", heroTitle: "Belanja dekat,", heroHighlight: "berdampak hebat.", heroDescription: "Temukan produk dan jasa dari tetangga sendiri.", promoTitle: "Promo warga Sawahan", promoDescription: "Temukan penawaran terbaru dari toko lokal.", promoCta: "Jelajahi sekarang", promoActive: 1, promoColor: "orange", logoUrl: null as string | null, bannerImageUrl: null as string | null, promoStartsAt: null as Date | null, promoEndsAt: null as Date | null, promoSlots: DEFAULT_PROMO_SLOTS };
 
 export async function getSiteSettings() {
   const db = await getDb(); if (!db) return DEFAULT_SITE_SETTINGS;
