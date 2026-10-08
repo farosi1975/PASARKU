@@ -1,7 +1,7 @@
 export const COURIER_SESSION_KEY = "pasarku_courier_session";
 export const COURIER_OTP = "123456";
 
-export type CourierProfile = { name: string; phone: string; vehicle: string; village?: string; address?: string; identityPhotoUrl?: string | null; selfiePhotoUrl?: string | null; verifiedAt?: string; verificationStatus?: "pending" | "verified" | "rejected" | "unverified" };
+export type CourierProfile = { name: string; phone: string; vehicle: string; village?: string; address?: string; avatarUrl?: string | null; identityPhotoUrl?: string | null; selfiePhotoUrl?: string | null; verifiedAt?: string; verificationStatus?: "pending" | "verified" | "rejected" | "unverified" };
 
 export function normalizeCourierPhone(value: string) {
   const digits = value.replace(/\D/g, "");

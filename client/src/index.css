@@ -1134,3 +1134,10 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .promo-slot-card { display: grid; gap: 10px; padding: 16px; border: 1px solid rgba(224, 103, 63, .22); border-radius: 16px; background: rgba(255, 248, 243, .72); }
 .promo-slot-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 720px) { .promo-slot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .promo-slots-heading, .promo-slot-card-heading { align-items: flex-start; } }
+
+/* Saved avatars are visible in role headers and profile cards. */
+.auth-icon .profile-photo,
+.seller-avatar .profile-photo,
+.courier-avatar .profile-photo,
+.seller-setting-icon .profile-photo,
+.courier-setting-icon .profile-photo { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; display: block; }
