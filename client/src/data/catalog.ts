@@ -44,12 +44,16 @@ export type MockOrder = {
   courier?: string;
 };
 
+export const PRODUCT_CATEGORIES = ["Kuliner", "Sembako", "Hasil tani", "Jasa", "Gerabah", "Elektronik"] as const;
+
 export const categories = [
   { label: "Semua", icon: "✦" },
   { label: "Kuliner", icon: "🍜" },
   { label: "Sembako", icon: "🧺" },
   { label: "Hasil tani", icon: "🌾" },
   { label: "Jasa", icon: "🛠" },
+  { label: "Gerabah", icon: "🏺" },
+  { label: "Elektronik", icon: "🔌" },
 ];
 
 export const products: Product[] = [
