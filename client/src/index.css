@@ -1162,3 +1162,11 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .hero-background-settings input[type=range] { width: 100%; accent-color: var(--orange); }
 .hero-background-preview { display: block; width: 100%; max-height: 120px; margin-top: 8px; object-fit: cover; object-position: center; border-radius: 10px; border: 1px solid #eadfd5; }
 @media (max-width: 720px) { .hero-background-settings { grid-template-columns: 1fr; } .hero-background-heading { grid-column: auto; } }
+
+/* Branding form draft controls */
+.branding-form-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 8px; padding-top: 14px; border-top: 1px solid rgba(122, 47, 47, .12); }
+.branding-save-status { font-size: 12px; font-weight: 700; }
+.branding-save-status.is-dirty { color: #b45309; }
+.branding-save-status.is-saved { color: #16805b; }
+.branding-action-buttons { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 640px) { .branding-form-actions, .branding-action-buttons { align-items: stretch; flex-direction: column; } .branding-action-buttons button { width: 100%; } }
