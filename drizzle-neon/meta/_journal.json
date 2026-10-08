@@ -64,6 +64,13 @@
       "when": 1791439353622,
       "tag": "0008_orange_norrin_radd",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791440155945,
+      "tag": "0009_fuzzy_felicia_hardy",
+      "breakpoints": true
     }
   ]
 }

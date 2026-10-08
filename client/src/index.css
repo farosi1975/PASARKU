@@ -1103,3 +1103,20 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .seller-profile-editor, .courier-profile-editor { margin: 16px 0; padding: 16px; border: 1px solid #eadbd2; border-radius: 14px; background: #fffdf9; box-shadow: 0 8px 24px rgba(113,71,54,.05); }
 .seller-profile-editor .primary-button, .courier-profile-editor .primary-button { justify-self: start; min-height: 36px; }
 @media (min-width: 620px) { .seller-profile-editor, .courier-profile-editor { grid-template-columns: repeat(2, minmax(0, 1fr)); } .seller-profile-editor .seller-form-title, .courier-profile-editor .courier-form-title, .seller-profile-editor .primary-button, .courier-profile-editor .primary-button { grid-column: 1 / -1; } }
+
+/* Editable branding and promo */
+.promo-strip { padding: 26px 0; background: #fff0e7; }
+.promo-strip.promo-purple { background: #eeeafd; }
+.promo-strip.promo-green { background: #e9f4e9; }
+.promo-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.promo-inner h2 { max-width: 720px; margin: 6px 0 0; font-family: "Space Grotesk", sans-serif; font-size: clamp(18px, 3vw, 28px); letter-spacing: -.045em; }
+.promo-purple .eyebrow { color: #6754aa; } .promo-green .eyebrow { color: #3f805d; }
+.admin-branding-panel { padding: 22px; margin: 22px 0; border: 1px solid #e9e1d8; border-radius: 16px; background: #fffdf9; box-shadow: 0 10px 28px rgba(57,42,31,.06); }
+.admin-branding-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.admin-branding-form label { display: grid; gap: 6px; color: #76675e; font-size: 10px; font-weight: 800; }
+.admin-branding-form input:not([type=checkbox]), .admin-branding-form select, .admin-branding-form textarea { width: 100%; border: 1px solid #e5dcd3; border-radius: 9px; padding: 9px 10px; color: #3d3530; background: #fff; font-size: 11px; }
+.admin-branding-form textarea { resize: vertical; }
+.admin-branding-form .wide-field, .admin-branding-form .primary-button { grid-column: 1 / -1; }
+.branding-switch { display: flex !important; align-items: center; gap: 8px; align-self: end; min-height: 38px; }
+.branding-switch input { accent-color: var(--orange); }
+@media (max-width: 620px) { .promo-inner { align-items: flex-start; flex-direction: column; } .admin-branding-form { grid-template-columns: 1fr; } .admin-branding-form .wide-field, .admin-branding-form .primary-button { grid-column: auto; } }

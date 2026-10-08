@@ -89,6 +89,21 @@ export const shippingSettings = pgTable("shipping_settings", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+export const siteSettings = pgTable("site_settings", {
+  id: serial("id").primaryKey(),
+  brandName: varchar("brandName", { length: 80 }).default("PASARKU").notNull(),
+  tagline: varchar("tagline", { length: 180 }).default("Belanja dekat, berdampak hebat.").notNull(),
+  heroTitle: varchar("heroTitle", { length: 180 }).default("Belanja dekat,").notNull(),
+  heroHighlight: varchar("heroHighlight", { length: 180 }).default("berdampak hebat.").notNull(),
+  heroDescription: text("heroDescription").default("Temukan produk dan jasa dari tetangga sendiri.").notNull(),
+  promoTitle: varchar("promoTitle", { length: 160 }).default("Promo warga Sawahan").notNull(),
+  promoDescription: text("promoDescription").default("Temukan penawaran terbaru dari toko lokal.").notNull(),
+  promoCta: varchar("promoCta", { length: 80 }).default("Jelajahi sekarang").notNull(),
+  promoActive: integer("promoActive").default(1).notNull(),
+  promoColor: varchar("promoColor", { length: 20 }).default("orange").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
 export const supportTicketStatusEnum = pgEnum("support_ticket_status", ["open", "in_progress", "resolved"]);
 
 export const supportTickets = pgTable("support_tickets", {

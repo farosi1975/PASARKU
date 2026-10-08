@@ -2,7 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { ENV } from "./_core/env";
-import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, supportTickets, userAccounts, users, visitorStats } from "../drizzle/schema";
+import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats } from "../drizzle/schema";
 
 let _pool: Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -82,6 +82,20 @@ export async function saveShippingSettings(input: { ratePerKm: number; discountP
   if (!db) throw new Error("Database belum tersedia.");
   await db.insert(shippingSettings).values({ id: 1, ...input }).onConflictDoUpdate({ target: shippingSettings.id, set: { ...input, updatedAt: new Date() } });
   return getShippingSettings();
+}
+
+const DEFAULT_SITE_SETTINGS = { id: 1, brandName: "PASARKU", tagline: "Belanja dekat, berdampak hebat.", heroTitle: "Belanja dekat,", heroHighlight: "berdampak hebat.", heroDescription: "Temukan produk dan jasa dari tetangga sendiri.", promoTitle: "Promo warga Sawahan", promoDescription: "Temukan penawaran terbaru dari toko lokal.", promoCta: "Jelajahi sekarang", promoActive: 1, promoColor: "orange" };
+
+export async function getSiteSettings() {
+  const db = await getDb(); if (!db) return DEFAULT_SITE_SETTINGS;
+  const rows = await db.select().from(siteSettings).where(eq(siteSettings.id, 1)).limit(1);
+  return rows[0] ?? DEFAULT_SITE_SETTINGS;
+}
+
+export async function saveSiteSettings(input: Omit<typeof DEFAULT_SITE_SETTINGS, "id">) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  await db.insert(siteSettings).values({ id: 1, ...input }).onConflictDoUpdate({ target: siteSettings.id, set: { ...input, updatedAt: new Date() } });
+  return getSiteSettings();
 }
 
 export async function createSupportTicket(input: { ticketCode: string; customerName: string; whatsapp: string; context: string; message: string }) {
