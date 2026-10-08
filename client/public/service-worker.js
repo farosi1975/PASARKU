@@ -1,4 +1,4 @@
-const CACHE_NAME = "pasarku-shell-v1";
+const CACHE_NAME = "pasarku-shell-v2";
 const SHELL = ["/", "/manifest.webmanifest", "/pwa-icon.svg"];
 
 self.addEventListener("install", event => {

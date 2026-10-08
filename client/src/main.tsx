@@ -10,7 +10,7 @@ import "./index.css";
 
 if ("serviceWorker" in navigator && (window.location.protocol === "https:" || window.location.hostname === "localhost")) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch(error => {
+    navigator.serviceWorker.register("/service-worker.js", { updateViaCache: "none" }).catch(error => {
       console.warn("[PWA] Service worker gagal didaftarkan", error);
     });
   });
