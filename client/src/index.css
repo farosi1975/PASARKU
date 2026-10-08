@@ -1124,3 +1124,5 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .branding-preview-logo { width: 58px; height: 58px; object-fit: contain; border-radius: 10px; border: 1px solid #eadfd5; background: #fff; padding: 5px; }
 .branding-preview-banner { width: 100%; max-height: 84px; object-fit: cover; border-radius: 9px; border: 1px solid #eadfd5; }
 .admin-branding-form input[type=file] { padding: 7px; font-size: 10px; }
+.branding-remove-button { width: fit-content; border: 0; padding: 0; color: #b94f3c; background: transparent; font-size: 10px; font-weight: 800; cursor: pointer; }
+.branding-remove-button:hover { text-decoration: underline; }
