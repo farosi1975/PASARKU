@@ -43,6 +43,22 @@ export async function listApprovedProducts() {
   return rows.filter(({ seller }) => { const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime); return opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing; }).map(({ product, seller }) => ({ ...product, sellerFreeShipping: Boolean(seller.freeShipping), sellerLocation: seller.currentLocation, sellerVillage: seller.village, openingTime: seller.openingTime, closingTime: seller.closingTime }));
 }
 
+export async function listOpenStores() {
+  const db = await getDb(); if (!db) return [];
+  const rows = await db.select({ product: products, seller: sellerProfiles }).from(products).innerJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(and(eq(products.status, "approved"), eq(sellerProfiles.verificationStatus, "verified"), eq(sellerProfiles.isBanned, 0), eq(sellerProfiles.isOpen, 1))).orderBy(desc(products.createdAt));
+  const now = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+  const minutes = (value: string) => { const [hour, minute] = value.split(":").map(Number); return hour * 60 + minute; };
+  const openRows = rows.filter(({ seller }) => { const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime); return opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing; });
+  const stores = new Map<number, any>();
+  for (const { product, seller } of openRows) {
+    const current = stores.get(seller.id) ?? { id: seller.id, shopName: seller.shopName, ownerName: seller.ownerName, village: seller.village, address: seller.address, avatarUrl: seller.avatarUrl, currentLocation: seller.currentLocation, openingTime: seller.openingTime, closingTime: seller.closingTime, freeShipping: Boolean(seller.freeShipping), productCount: 0, previewProducts: [] };
+    current.productCount += 1;
+    if (current.previewProducts.length < 3) current.previewProducts.push({ id: product.id, name: product.name, imageUrl: product.imageUrl, price: product.price });
+    stores.set(seller.id, current);
+  }
+  return Array.from(stores.values());
+}
+
 export async function listSellerProducts(whatsapp: string) {
   const db = await getDb(); if (!db) return [];
   const sellers = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1);
@@ -71,13 +87,13 @@ export async function listSellerOrders(whatsapp: string) {
 
 export async function getShippingSettings() {
   const db = await getDb();
-  if (!db) return { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901", supportOpeningTime: "08:00", supportClosingTime: "20:00" };
+  if (!db) return { ratePerKm: 3000, discountPercent: 0, handlingFeePercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901", supportOpeningTime: "08:00", supportClosingTime: "20:00" };
   const rows = await db.select().from(shippingSettings).where(eq(shippingSettings.id, 1)).limit(1);
   const settings = rows[0];
-  return settings ? { ratePerKm: settings.ratePerKm, discountPercent: settings.discountPercent, originLatitude: settings.originLatitude, originLongitude: settings.originLongitude, adminWhatsapp: settings.adminWhatsapp, supportOpeningTime: settings.supportOpeningTime, supportClosingTime: settings.supportClosingTime } : { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901", supportOpeningTime: "08:00", supportClosingTime: "20:00" };
+  return settings ? { ratePerKm: settings.ratePerKm, discountPercent: settings.discountPercent, handlingFeePercent: settings.handlingFeePercent, originLatitude: settings.originLatitude, originLongitude: settings.originLongitude, adminWhatsapp: settings.adminWhatsapp, supportOpeningTime: settings.supportOpeningTime, supportClosingTime: settings.supportClosingTime } : { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901", handlingFeePercent: 0, supportOpeningTime: "08:00", supportClosingTime: "20:00" };
 }
 
-export async function saveShippingSettings(input: { ratePerKm: number; discountPercent: number; originLatitude: string; originLongitude: string; adminWhatsapp: string; supportOpeningTime: string; supportClosingTime: string }) {
+export async function saveShippingSettings(input: { ratePerKm: number; discountPercent: number; handlingFeePercent: number; originLatitude: string; originLongitude: string; adminWhatsapp: string; supportOpeningTime: string; supportClosingTime: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database belum tersedia.");
   await db.insert(shippingSettings).values({ id: 1, ...input }).onConflictDoUpdate({ target: shippingSettings.id, set: { ...input, updatedAt: new Date() } });

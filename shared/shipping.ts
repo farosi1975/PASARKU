@@ -1,6 +1,7 @@
 export type ShippingSettings = {
   ratePerKm: number;
   discountPercent: number;
+  handlingFeePercent?: number;
   originLatitude: string;
   originLongitude: string;
 };
@@ -8,6 +9,7 @@ export type ShippingSettings = {
 export const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
   ratePerKm: 3000,
   discountPercent: 0,
+  handlingFeePercent: 0,
   originLatitude: "-7.602345",
   originLongitude: "111.904321",
 };

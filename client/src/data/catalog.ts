@@ -1,5 +1,6 @@
 export type Product = {
   id: string;
+  sellerId?: number;
   name: string;
   vendor: string;
   category: string;
