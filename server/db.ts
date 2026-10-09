@@ -1,15 +1,50 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle as drizzlePostgres } from "drizzle-orm/node-postgres";
+import { drizzle as drizzleMySql } from "drizzle-orm/mysql2";
 import { Pool } from "pg";
+import { createPool as createMySqlPool } from "mysql2/promise";
 import { ENV } from "./_core/env";
-import { InsertUser, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats } from "../drizzle/schema";
+import type { InsertUser } from "../drizzle/schema";
+import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, databaseDialect } from "./db-tables";
 
 let _pool: Pool | null = null;
-let _db: ReturnType<typeof drizzle> | null = null;
+let _mysqlPool: ReturnType<typeof createMySqlPool> | null = null;
+type CompatibleDatabase = ReturnType<typeof drizzlePostgres>;
+let _db: CompatibleDatabase | null = null;
 
-export async function getDb() {
+const wrapMySqlQuery = (query: any): any => new Proxy(query, {
+  get(target, property, receiver) {
+    if (property === "onConflictDoUpdate") {
+      return (config: { set: Record<string, unknown> }) => target.onDuplicateKeyUpdate({ set: config.set });
+    }
+    const value = Reflect.get(target, property, receiver);
+    if (typeof value !== "function") return value;
+    return (...args: unknown[]) => wrapMySqlQuery(value.apply(target, args));
+  },
+});
+
+const wrapMySqlDatabase = (database: any): CompatibleDatabase => new Proxy(database, {
+  get(target, property, receiver) {
+    if (property === "insert" || property === "update") {
+      return (table: unknown) => wrapMySqlQuery(target[property](table));
+    }
+    const value = Reflect.get(target, property, receiver);
+    return typeof value === "function" ? value.bind(target) : value;
+  },
+}) as CompatibleDatabase;
+
+export async function getDb(): Promise<CompatibleDatabase | null> {
   if (!_db && process.env.DATABASE_URL) {
-    try { _pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined }); _db = drizzle(_pool); } catch (error) { console.warn("[Database] Failed to connect:", error); _pool = null; _db = null; }
+    try {
+      if (databaseDialect === "mysql") {
+        _mysqlPool = createMySqlPool(process.env.DATABASE_URL);
+        _db = wrapMySqlDatabase(drizzleMySql(_mysqlPool));
+      } else {
+        _pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined });
+        _db = drizzlePostgres(_pool);
+      }
+      console.info(`[Database] Connected using ${databaseDialect} adapter.`);
+    } catch (error) { console.warn("[Database] Failed to connect:", error); _pool = null; _mysqlPool = null; _db = null; }
   }
   return _db;
 }
@@ -135,7 +170,8 @@ export async function saveSiteSettings(input: Partial<Omit<typeof DEFAULT_SITE_S
 
 export async function createSupportTicket(input: { ticketCode: string; customerName: string; whatsapp: string; context: string; message: string }) {
   const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
-  const rows = await db.insert(supportTickets).values({ ...input, status: "open" }).returning();
+  await db.insert(supportTickets).values({ ...input, status: "open" });
+  const rows = await db.select().from(supportTickets).where(eq(supportTickets.ticketCode, input.ticketCode)).limit(1);
   return rows[0];
 }
 
@@ -146,7 +182,8 @@ export async function listSupportTickets() {
 
 export async function updateSupportTicketStatus(id: number, status: "open" | "in_progress" | "resolved") {
   const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
-  const rows = await db.update(supportTickets).set({ status, updatedAt: new Date() }).where(eq(supportTickets.id, id)).returning();
+  await db.update(supportTickets).set({ status, updatedAt: new Date() }).where(eq(supportTickets.id, id));
+  const rows = await db.select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
   return rows[0] ?? null;
 }
 
