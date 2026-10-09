@@ -59,6 +59,22 @@ export async function listOpenStores() {
   return Array.from(stores.values());
 }
 
+export async function getPublicStoreDetail(sellerId: number) {
+  const db = await getDb(); if (!db) return null;
+  const sellers = await db.select().from(sellerProfiles).where(eq(sellerProfiles.id, sellerId)).limit(1);
+  const seller = sellers[0];
+  if (!seller || seller.verificationStatus !== "verified" || seller.isBanned) return null;
+  const productRows = await db.select().from(products).where(and(eq(products.sellerId, sellerId), eq(products.status, "approved"))).orderBy(desc(products.createdAt));
+  const now = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+  const minutes = (value: string) => { const [hour, minute] = value.split(":").map(Number); return hour * 60 + minute; };
+  const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime);
+  const withinSchedule = opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing;
+  return {
+    store: { id: seller.id, shopName: seller.shopName, ownerName: seller.ownerName, whatsapp: seller.whatsapp, village: seller.village, address: seller.address, currentLocation: seller.currentLocation, avatarUrl: seller.avatarUrl, openingTime: seller.openingTime, closingTime: seller.closingTime, isOpen: Boolean(seller.isOpen), withinSchedule, freeShipping: Boolean(seller.freeShipping), productCount: productRows.length },
+    products: productRows.map((product) => ({ ...product, sellerFreeShipping: Boolean(seller.freeShipping), sellerLocation: seller.currentLocation, sellerVillage: seller.village, openingTime: seller.openingTime, closingTime: seller.closingTime, storeOpen: Boolean(seller.isOpen && withinSchedule) })),
+  };
+}
+
 export async function listSellerProducts(whatsapp: string) {
   const db = await getDb(); if (!db) return [];
   const sellers = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1);

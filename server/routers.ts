@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, getSiteSettings, listAdminProfiles, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole } from "./db";
+import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, getPublicStoreDetail, getSiteSettings, listAdminProfiles, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -126,6 +126,7 @@ export const appRouter = router({
   marketplace: router({
     products: publicProcedure.query(() => listApprovedProducts()),
     openStores: publicProcedure.query(() => listOpenStores()),
+    storeDetail: publicProcedure.input(z.object({ sellerId: z.number().int().positive() })).query(({ input }) => getPublicStoreDetail(input.sellerId)),
     recordVisit: publicProcedure.mutation(() => recordVisitorVisit()),
     requestBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2).optional() })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);

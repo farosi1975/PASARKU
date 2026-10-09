@@ -1205,6 +1205,9 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .store-profile-copy p { margin:0 0 12px; color:#796d67; }
 .store-profile-status { display:flex; align-items:center; gap:14px; color:#796d67; font-size:.9rem; }
 .store-profile-status > span:last-child { display:inline-flex; align-items:center; gap:5px; }
+.store-closed-dot { color:#a45a42; font-size:.78rem; font-weight:700; white-space:nowrap; }
+.store-closed-notice { display:flex; align-items:center; gap:10px; padding:14px 16px; margin-top:14px; border:1px solid #efd3c5; border-radius:14px; color:#85594c; background:#fff1e8; font-size:.85rem; }
+.store-closed-notice svg { flex:0 0 auto; color:var(--orange); }
 .whatsapp-store-button, .store-bottom-contact { display:inline-flex; align-items:center; gap:9px; border:0; border-radius:13px; background:#159447; color:#fff; padding:13px 16px; font-weight:700; cursor:pointer; transition:transform .16s ease,background .16s ease; }
 .whatsapp-store-button:hover, .store-bottom-contact:hover { background:#107c3b; transform:translateY(-1px); }
 .store-info-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:24px 0 48px; }
@@ -1230,6 +1233,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .store-profile-copy { flex-basis:calc(100% - 90px); }
   .store-profile-copy h1 { font-size:2rem; }
   .whatsapp-store-button { width:100%; justify-content:center; }
+  .store-closed-notice { align-items:flex-start; font-size:.78rem; line-height:1.5; }
   .store-info-grid { grid-template-columns:1fr; margin-bottom:34px; }
   .store-product-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
   .store-product-grid .product-body { padding:12px; }
