@@ -12,4 +12,7 @@ export const ENV = {
   r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? "",
   r2Bucket: process.env.R2_BUCKET ?? "",
   r2PublicBaseUrl: process.env.R2_PUBLIC_BASE_URL ?? "",
+  supabaseUrl: process.env.SUPABASE_URL ?? "",
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  supabaseBucket: process.env.SUPABASE_BUCKET_NAME ?? "Produk-PasarKu",
 };

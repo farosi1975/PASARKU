@@ -4,6 +4,8 @@ import { ENV } from "./_core/env";
 
 export type StoragePutResult = { key: string; url: string | null };
 
+type StorageData = Buffer | Uint8Array | string;
+
 function getForgeConfig() {
   const forgeUrl = ENV.forgeApiUrl;
   const forgeKey = ENV.forgeApiKey;
@@ -27,7 +29,16 @@ function getR2Config() {
   };
 }
 
-function buildInlineDataUrl(data: Buffer | Uint8Array | string, contentType: string): string {
+function getSupabaseConfig() {
+  if (!ENV.supabaseUrl || !ENV.supabaseServiceRoleKey || !ENV.supabaseBucket) return null;
+  return {
+    baseUrl: ENV.supabaseUrl.replace(/\/+$/, ""),
+    serviceRoleKey: ENV.supabaseServiceRoleKey,
+    bucket: ENV.supabaseBucket,
+  };
+}
+
+function buildInlineDataUrl(data: StorageData, contentType: string): string {
   return `data:${contentType};base64,${Buffer.from(data).toString("base64")}`;
 }
 
@@ -42,15 +53,43 @@ function appendHashSuffix(relKey: string): string {
   return `${relKey.slice(0, lastDot)}_${hash}${relKey.slice(lastDot)}`;
 }
 
-async function putToR2(key: string, data: Buffer | Uint8Array | string, contentType: string, requirePublicUrl: boolean): Promise<StoragePutResult | null> {
+function encodeStoragePath(key: string): string {
+  return key.split("/").map(encodeURIComponent).join("/");
+}
+
+async function putToSupabase(key: string, data: StorageData, contentType: string, requirePublicUrl: boolean): Promise<StoragePutResult | null> {
+  const supabase = getSupabaseConfig();
+  if (!supabase || !requirePublicUrl) return null;
+  const uploadUrl = `${supabase.baseUrl}/storage/v1/object/${encodeURIComponent(supabase.bucket)}/${encodeStoragePath(key)}`;
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${supabase.serviceRoleKey}`,
+      apikey: supabase.serviceRoleKey,
+      "Content-Type": contentType,
+      "x-upsert": "true",
+      "cache-control": "31536000",
+    },
+    body: Buffer.from(data),
+  });
+  if (!response.ok) {
+    const message = await response.text().catch(() => response.statusText);
+    throw new Error(`Supabase Storage upload failed (${response.status}): ${message.slice(0, 300)}`);
+  }
+  return { key, url: `${supabase.baseUrl}/storage/v1/object/public/${encodeURIComponent(supabase.bucket)}/${encodeStoragePath(key)}` };
+}
+
+async function putToR2(key: string, data: StorageData, contentType: string, requirePublicUrl: boolean): Promise<StoragePutResult | null> {
   const r2 = getR2Config();
   if (!r2 || (requirePublicUrl && !r2.publicBaseUrl)) return null;
   await r2.client.send(new PutObjectCommand({ Bucket: r2.bucket, Key: key, Body: data, ContentType: contentType }));
   return { key, url: r2.publicBaseUrl ? `${r2.publicBaseUrl}/${key}` : null };
 }
 
-export async function storagePut(relKey: string, data: Buffer | Uint8Array | string, contentType = "application/octet-stream"): Promise<{ key: string; url: string }> {
+export async function storagePut(relKey: string, data: StorageData, contentType = "application/octet-stream", options?: { useSupabase?: boolean }): Promise<{ key: string; url: string }> {
   const key = appendHashSuffix(normalizeKey(relKey));
+  const supabaseResult = options?.useSupabase === false ? null : await putToSupabase(key, data, contentType, true);
+  if (supabaseResult?.url) return { key: supabaseResult.key, url: supabaseResult.url };
   const r2Result = await putToR2(key, data, contentType, true);
   if (r2Result?.url) return { key: r2Result.key, url: r2Result.url };
 
@@ -73,12 +112,12 @@ export async function storagePut(relKey: string, data: Buffer | Uint8Array | str
   return { key, url: `/manus-storage/${key}` };
 }
 
-/** Uploads a document to a private R2 bucket. The database should store the key, not a public URL. */
-export async function storagePutPrivate(relKey: string, data: Buffer | Uint8Array | string, contentType = "application/octet-stream"): Promise<StoragePutResult> {
+/** Uploads a document to private R2/legacy storage. Supabase public storage is reserved for catalog images. */
+export async function storagePutPrivate(relKey: string, data: StorageData, contentType = "application/octet-stream"): Promise<StoragePutResult> {
   const key = appendHashSuffix(normalizeKey(relKey));
   const r2Result = await putToR2(key, data, contentType, false);
   if (r2Result) return r2Result;
-  const legacy = await storagePut(relKey, data, contentType);
+  const legacy = await storagePut(relKey, data, contentType, { useSupabase: false });
   return { key: legacy.key, url: legacy.url };
 }
 
