@@ -51,7 +51,7 @@ export async function listOpenStores() {
   const openRows = rows.filter(({ seller }) => { const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime); return opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing; });
   const stores = new Map<number, any>();
   for (const { product, seller } of openRows) {
-    const current = stores.get(seller.id) ?? { id: seller.id, shopName: seller.shopName, ownerName: seller.ownerName, village: seller.village, address: seller.address, avatarUrl: seller.avatarUrl, currentLocation: seller.currentLocation, openingTime: seller.openingTime, closingTime: seller.closingTime, freeShipping: Boolean(seller.freeShipping), productCount: 0, previewProducts: [] };
+    const current = stores.get(seller.id) ?? { id: seller.id, shopName: seller.shopName, ownerName: seller.ownerName, whatsapp: seller.whatsapp, village: seller.village, address: seller.address, avatarUrl: seller.avatarUrl, currentLocation: seller.currentLocation, openingTime: seller.openingTime, closingTime: seller.closingTime, freeShipping: Boolean(seller.freeShipping), productCount: 0, previewProducts: [] };
     current.productCount += 1;
     if (current.previewProducts.length < 3) current.previewProducts.push({ id: product.id, name: product.name, imageUrl: product.imageUrl, price: product.price });
     stores.set(seller.id, current);
