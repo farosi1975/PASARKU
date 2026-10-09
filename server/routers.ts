@@ -166,16 +166,23 @@ export const appRouter = router({
       if (!input.challengeToken && (!buyerChallenges.has(whatsapp) || challenge.expiresAt < Date.now())) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP belum benar atau sudah kedaluwarsa. Minta OTP baru." });
       const submittedHash = createHmac("sha256", process.env.JWT_SECRET?.trim() || "pasarku-otp-development-secret").update(input.otp).digest("hex");
       if ((input.challengeToken ? submittedHash !== token?.otpHash : challenge.otp !== input.otp)) { const error = invalidOtp(challenge, "OTP belum benar."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) buyerChallenges.delete(whatsapp); throw error; }
-      buyerChallenges.delete(whatsapp);
-      const existing = await getBuyerProfile(whatsapp);
-      if (existing?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli diblokir oleh Admin PASARKU." });
-      const displayName = existing?.name || challenge.name || `Warga ${whatsapp.slice(-4)}`;
-      if (!existing) {
-        const db = await dbRequired();
-        await db.insert(buyerProfiles).values({ name: displayName, whatsapp, village: "Sawahan", address: "", verificationStatus: "verified", isBanned: 0 });
+      try {
+        const existing = await getBuyerProfile(whatsapp);
+        if (existing?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli diblokir oleh Admin PASARKU." });
+        const displayName = existing?.name || challenge.name || `Warga ${whatsapp.slice(-4)}`;
+        if (!existing) {
+          const db = await dbRequired();
+          await db.insert(buyerProfiles).values({ name: displayName, whatsapp, village: "Sawahan", address: "", verificationStatus: "verified", isBanned: 0 });
+        }
+        await upsertAccountRole(whatsapp, "buyer", displayName);
+        // Consume the challenge only after profile and multi-role sync succeed.
+        buyerChallenges.delete(whatsapp);
+        return { name: displayName, whatsapp };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error("[OTP] Sinkronisasi profil pembeli setelah verifikasi gagal:", error instanceof Error ? error.message : error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Kode OTP benar, tetapi profil belum dapat disinkronkan. Silakan tekan Verifikasi lagi." });
       }
-      await upsertAccountRole(whatsapp, "buyer", displayName);
-      return { name: displayName, whatsapp };
     }),
     requestAdminOtp: publicProcedure.input(z.object({ whatsapp: phone })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);

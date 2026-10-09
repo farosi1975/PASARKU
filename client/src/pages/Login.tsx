@@ -43,7 +43,9 @@ export default function Login() {
       toast.success(mode === "register" ? "Akun berhasil dibuat" : "Berhasil masuk", { description: `Selamat datang di PASARKU, ${profile.name}.` });
       navigate("/");
     } catch (error) {
-      toast.error("OTP belum benar", { description: error instanceof Error ? error.message : "Masukkan kode terbaru dari WhatsApp." });
+      const message = error instanceof Error ? error.message : "Masukkan kode terbaru dari WhatsApp.";
+      const isOtpError = /OTP belum benar|OTP belum benar atau|kedaluwarsa|Percobaan tersisa/i.test(message);
+      toast.error(isOtpError ? "OTP belum benar" : "Login belum selesai", { description: message });
     }
   };
 
