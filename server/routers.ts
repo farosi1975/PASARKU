@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { randomBytes, randomInt } from "node:crypto";
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -26,6 +26,21 @@ const sellerChallenges = new Map<string, { otp: string; shopName: string; ownerN
 const courierChallenges = new Map<string, { otp: string; name: string; vehicle: string; expiresAt: number; attempts: number }>();
 const normalizePhone = (value: string) => { const digits = value.replace(/\D/g, ""); return digits.startsWith("0") ? `62${digits.slice(1)}` : digits; };
 const otpKey = (scope: string, whatsapp: string) => `${scope}:${whatsapp}`;
+const otpSignature = (payload: string) => createHmac("sha256", process.env.JWT_SECRET?.trim() || "pasarku-otp-development-secret").update(payload).digest("base64url");
+const createOtpChallengeToken = (scope: "buyer" | "admin", whatsapp: string, otp: string) => {
+  const payload = Buffer.from(JSON.stringify({ scope, whatsapp, otpHash: createHmac("sha256", process.env.JWT_SECRET?.trim() || "pasarku-otp-development-secret").update(otp).digest("hex"), expiresAt: Date.now() + OTP_TTL_MS })).toString("base64url");
+  return `${payload}.${otpSignature(payload)}`;
+};
+const readOtpChallengeToken = (token: string) => {
+  try {
+    const [payload, signature] = token.split(".");
+    if (!payload || !signature) return null;
+    const expected = otpSignature(payload);
+    if (expected.length !== signature.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) return null;
+    const value = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { scope?: string; whatsapp?: string; otpHash?: string; expiresAt?: number };
+    return value.expiresAt && value.expiresAt >= Date.now() ? value : null;
+  } catch { return null; }
+};
 const beginOtpSend = (scope: string, whatsapp: string) => {
   const key = otpKey(scope, whatsapp); const lastSent = otpLastSent.get(key) ?? 0; const remaining = OTP_COOLDOWN_MS - (Date.now() - lastSent);
   if (remaining > 0) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Tunggu ${Math.ceil(remaining / 1000)} detik sebelum meminta OTP lagi.` });
@@ -140,13 +155,15 @@ export const appRouter = router({
         cancelOtpCooldown("buyer", whatsapp);
         throw new TRPCError({ code: "BAD_GATEWAY", message: error instanceof Error ? error.message : "OTP FONNTE gagal dikirim." });
       }
-      return { success: true, expiresIn: 300 } as const;
+      return { success: true, expiresIn: 300, challengeToken: createOtpChallengeToken("buyer", whatsapp, otp) } as const;
     }),
-    verifyBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, otp: z.string().regex(/^\d{6}$/) })).mutation(async ({ input }) => {
+    verifyBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, otp: z.string().regex(/^\d{6}$/), challengeToken: z.string().min(20) })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
-      const challenge = buyerChallenges.get(whatsapp);
-      if (!challenge || challenge.expiresAt < Date.now()) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP belum benar atau sudah kedaluwarsa. Minta OTP baru." });
-      if (challenge.otp !== input.otp) { const error = invalidOtp(challenge, "OTP belum benar."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) buyerChallenges.delete(whatsapp); throw error; }
+      const token = readOtpChallengeToken(input.challengeToken);
+      const challenge = buyerChallenges.get(whatsapp) ?? { otp: "", name: undefined, expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 };
+      if (!token || token.scope !== "buyer" || token.whatsapp !== whatsapp || !token.otpHash) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP belum benar atau sudah kedaluwarsa. Minta OTP baru." });
+      const submittedHash = createHmac("sha256", process.env.JWT_SECRET?.trim() || "pasarku-otp-development-secret").update(input.otp).digest("hex");
+      if (submittedHash !== token.otpHash) { const error = invalidOtp(challenge, "OTP belum benar."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) buyerChallenges.delete(whatsapp); throw error; }
       buyerChallenges.delete(whatsapp);
       const existing = await getBuyerProfile(whatsapp);
       if (existing?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli diblokir oleh Admin PASARKU." });
@@ -172,13 +189,15 @@ export const appRouter = router({
         cancelOtpCooldown("admin", whatsapp);
         throw new TRPCError({ code: "BAD_GATEWAY", message: error instanceof Error ? error.message : "OTP FONNTE gagal dikirim." });
       }
-      return { success: true, expiresIn: 300 } as const;
+      return { success: true, expiresIn: 300, challengeToken: createOtpChallengeToken("admin", whatsapp, otp) } as const;
     }),
-    verifyAdminOtp: publicProcedure.input(z.object({ whatsapp: phone, otp: z.string().regex(/^\d{6}$/) })).mutation(async ({ input }) => {
+    verifyAdminOtp: publicProcedure.input(z.object({ whatsapp: phone, otp: z.string().regex(/^\d{6}$/), challengeToken: z.string().min(20) })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
-      const challenge = adminChallenges.get(whatsapp);
-      if (!challenge || challenge.expiresAt < Date.now()) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP admin tidak valid atau sudah kedaluwarsa. Minta OTP baru." });
-      if (challenge.otp !== input.otp) { const error = invalidOtp(challenge, "OTP admin tidak valid."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) adminChallenges.delete(whatsapp); throw error; }
+      const token = readOtpChallengeToken(input.challengeToken);
+      const challenge = adminChallenges.get(whatsapp) ?? { otp: "", expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 };
+      if (!token || token.scope !== "admin" || token.whatsapp !== whatsapp || !token.otpHash) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP admin tidak valid atau sudah kedaluwarsa. Minta OTP baru." });
+      const submittedHash = createHmac("sha256", process.env.JWT_SECRET?.trim() || "pasarku-otp-development-secret").update(input.otp).digest("hex");
+      if (submittedHash !== token.otpHash) { const error = invalidOtp(challenge, "OTP admin tidak valid."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) adminChallenges.delete(whatsapp); throw error; }
       const profile = await getAdminProfile(whatsapp);
       if (!profile) throw new TRPCError({ code: "FORBIDDEN", message: "Admin tidak terverifikasi." });
       adminChallenges.delete(whatsapp);
