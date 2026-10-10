@@ -20,6 +20,7 @@ export const {
   visitorStats,
   adminProfiles,
   userAccounts,
+  adminAuditLogs,
   products,
   orders,
   orderItems,

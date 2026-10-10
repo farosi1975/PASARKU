@@ -150,6 +150,17 @@ export const userAccounts = mysqlTable("user_accounts", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+export const adminAuditLogs = mysqlTable("admin_audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  adminName: varchar("adminName", { length: 160 }).notNull(),
+  adminWhatsapp: varchar("adminWhatsapp", { length: 32 }).notNull(),
+  action: varchar("action", { length: 80 }).notNull(),
+  targetRole: varchar("targetRole", { length: 20 }).notNull(),
+  targetId: int("targetId").notNull(),
+  targetName: varchar("targetName", { length: 180 }).notNull(),
+  details: text("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
 export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   sellerId: int("sellerId"),

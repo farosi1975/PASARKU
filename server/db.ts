@@ -5,7 +5,7 @@ import { Pool } from "pg";
 import { createPool as createMySqlPool } from "mysql2/promise";
 import { ENV } from "./_core/env";
 import type { InsertUser } from "../drizzle/schema";
-import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, databaseDialect } from "./db-tables";
+import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, databaseDialect } from "./db-tables";
 
 let _pool: Pool | null = null;
 let _mysqlPool: ReturnType<typeof createMySqlPool> | null = null;
@@ -293,6 +293,12 @@ export async function getAdminUserDirectory() {
   };
 }
 
+export async function listAdminAuditLogs() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(adminAuditLogs).orderBy(desc(adminAuditLogs.createdAt)).limit(50);
+}
+
 export async function resetMarketplaceData() {
   const db = await getDb();
   if (!db) throw new Error("Database belum tersedia.");
@@ -309,21 +315,24 @@ export async function resetMarketplaceData() {
   return { success: true as const };
 }
 
-export async function deleteMarketplaceUser(role: "buyer" | "seller" | "courier", id: number) {
+export async function deleteMarketplaceUser(role: "buyer" | "seller" | "courier", id: number, admin: { name: string; whatsapp: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database belum tersedia.");
   const roleField = { buyer: "isBuyer", seller: "isSeller", courier: "isCourier" }[role] as "isBuyer" | "isSeller" | "isCourier";
   let whatsapp: string | null = null;
+  let targetName = "";
   await db.transaction(async (tx) => {
     if (role === "buyer") {
-      const rows = await tx.select({ whatsapp: buyerProfiles.whatsapp }).from(buyerProfiles).where(eq(buyerProfiles.id, id)).limit(1);
+      const rows = await tx.select({ whatsapp: buyerProfiles.whatsapp, name: buyerProfiles.name }).from(buyerProfiles).where(eq(buyerProfiles.id, id)).limit(1);
       if (!rows[0]) throw new Error("Data pembeli tidak ditemukan.");
       whatsapp = rows[0].whatsapp;
+      targetName = rows[0].name;
       await tx.delete(buyerProfiles).where(eq(buyerProfiles.id, id));
     } else if (role === "seller") {
-      const rows = await tx.select({ whatsapp: sellerProfiles.whatsapp }).from(sellerProfiles).where(eq(sellerProfiles.id, id)).limit(1);
+      const rows = await tx.select({ whatsapp: sellerProfiles.whatsapp, shopName: sellerProfiles.shopName }).from(sellerProfiles).where(eq(sellerProfiles.id, id)).limit(1);
       if (!rows[0]) throw new Error("Data toko tidak ditemukan.");
       whatsapp = rows[0].whatsapp;
+      targetName = rows[0].shopName;
       const sellerProducts = await tx.select({ id: products.id }).from(products).where(eq(products.sellerId, id));
       const productIds = sellerProducts.map((item) => item.id);
       if (productIds.length) {
@@ -332,9 +341,10 @@ export async function deleteMarketplaceUser(role: "buyer" | "seller" | "courier"
       }
       await tx.delete(sellerProfiles).where(eq(sellerProfiles.id, id));
     } else {
-      const rows = await tx.select({ whatsapp: courierProfiles.whatsapp }).from(courierProfiles).where(eq(courierProfiles.id, id)).limit(1);
+      const rows = await tx.select({ whatsapp: courierProfiles.whatsapp, name: courierProfiles.name }).from(courierProfiles).where(eq(courierProfiles.id, id)).limit(1);
       if (!rows[0]) throw new Error("Data kurir tidak ditemukan.");
       whatsapp = rows[0].whatsapp;
+      targetName = rows[0].name;
       await tx.update(orders).set({ courierId: null }).where(eq(orders.courierId, id));
       await tx.delete(courierProfiles).where(eq(courierProfiles.id, id));
     }
@@ -348,6 +358,7 @@ export async function deleteMarketplaceUser(role: "buyer" | "seller" | "courier"
         if (next && !next.isBuyer && !next.isSeller && !next.isCourier && !next.isAdmin) await tx.delete(userAccounts).where(eq(userAccounts.whatsapp, whatsapp));
       }
     }
+    await tx.insert(adminAuditLogs).values({ adminName: admin.name, adminWhatsapp: admin.whatsapp, action: "delete_user", targetRole: role, targetId: id, targetName, details: role === "seller" ? "Profil toko dan produk dihapus; histori pesanan dipertahankan." : "Profil dihapus; histori pesanan dipertahankan." });
   });
   return { success: true as const, role, id };
 }

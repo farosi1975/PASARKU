@@ -158,6 +158,17 @@ export const userAccounts = pgTable("user_accounts", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+export const adminAuditLogs = pgTable("admin_audit_logs", {
+  id: serial("id").primaryKey(),
+  adminName: varchar("adminName", { length: 160 }).notNull(),
+  adminWhatsapp: varchar("adminWhatsapp", { length: 32 }).notNull(),
+  action: varchar("action", { length: 80 }).notNull(),
+  targetRole: varchar("targetRole", { length: 20 }).notNull(),
+  targetId: integer("targetId").notNull(),
+  targetName: varchar("targetName", { length: 180 }).notNull(),
+  details: text("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   sellerId: integer("sellerId"),
