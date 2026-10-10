@@ -6,7 +6,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, getPublicStoreDetail, getSiteSettings, listAdminProfiles, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "./db-tables";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendFonnteMessage } from "./fonnte";
 import { storageGetSignedUrl, storagePut, storagePutPrivate } from "./storage";
@@ -14,6 +14,20 @@ import { calculateShippingCost, parseCoordinates } from "../shared/shipping";
 
 const phone = z.string().min(10).max(32);
 const dbRequired = async () => { const db = await getDb(); if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database belum tersedia." }); return db; };
+const affectedRows = (result: unknown) => Number((result as any)?.rowCount ?? (result as any)?.[0]?.affectedRows ?? 0);
+const deductStockForConfirmedOrder = async (tx: any, orderCode: string) => {
+  const current = await tx.select({ id: orders.id, status: orders.status, stockDeductedAt: orders.stockDeductedAt }).from(orders).where(eq(orders.orderCode, orderCode)).limit(1);
+  if (!current[0] || current[0].status !== "Diproses" || current[0].stockDeductedAt) return { deducted: false };
+  const claimed = await tx.update(orders).set({ stockDeductedAt: new Date(), updatedAt: new Date() }).where(and(eq(orders.id, current[0].id), eq(orders.status, "Diproses"), isNull(orders.stockDeductedAt)));
+  if (!affectedRows(claimed)) return { deducted: false };
+  const items = await tx.select({ productId: orderItems.productId, quantity: orderItems.quantity, productName: orderItems.productName }).from(orderItems).where(eq(orderItems.orderId, current[0].id));
+  for (const item of items) {
+    if (!item.productId) continue;
+    const updated = await tx.update(products).set({ stock: sql`${products.stock} - ${item.quantity}`, updatedAt: new Date() }).where(and(eq(products.id, item.productId), gte(products.stock, item.quantity)));
+    if (!affectedRows(updated)) throw new TRPCError({ code: "CONFLICT", message: `Stok ${item.productName} tidak mencukupi untuk konfirmasi pesanan.` });
+  }
+  return { deducted: true };
+};
 const adminSessionToken = z.string().min(32).max(128);
 const OTP_COOLDOWN_MS = 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
@@ -529,7 +543,7 @@ export const appRouter = router({
       return { success: true as const, orderCode: input.orderCode, status: "Diproses" as const };
     }),
     updateOrderStatus: publicProcedure.input(z.object({ orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { const db = await dbRequired(); await db.update(orders).set({ status: input.status }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
-    updateAdminOrderStatus: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); await db.update(orders).set({ status: input.status }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
+    updateAdminOrderStatus: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); if (input.status === "Diproses") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); await deductStockForConfirmedOrder(tx, input.orderCode); }); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); } return getOrderWithItems(input.orderCode); }),
     confirmDelivery: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).mutation(async ({ input }) => { const db = await dbRequired(); await db.update(orders).set({ status: "Selesai" }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
   }),
 });

@@ -205,6 +205,7 @@ export const orders = pgTable("orders", {
   courierAcceptedAt: timestamp("courierAcceptedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  stockDeductedAt: timestamp("stockDeductedAt"),
 });
 
 export const orderItems = pgTable("order_items", {
