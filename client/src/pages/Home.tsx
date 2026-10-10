@@ -45,7 +45,7 @@ function Header({ onCart, logoUrl, brandName }: { onCart: () => void; logoUrl?: 
     setProfileOpen(false);
     window.dispatchEvent(new Event(AUTH_EVENT));
     toast.success("Anda sudah keluar", { description: "Sesi pengguna di browser ini telah dihapus." });
-    navigate("/masuk");
+    window.location.assign("/masuk");
   };
   return (
     <header className="site-header">

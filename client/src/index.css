@@ -389,7 +389,9 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 @media (max-width: 720px) {
   .container-wide { width: min(100% - 32px, 540px); }
   .site-header { height: 68px; }
-  .desktop-nav, .login-button { display: none; }
+  .desktop-nav { display: none; }
+  .header-actions { gap: 8px; }
+  .login-button { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 9px 12px; font-size: 11px; white-space: nowrap; }
   .hero-grid { display: block; }
   .hero-copy { padding: 62px 0 30px; }
   .hero-copy h1 { font-size: 54px; }
