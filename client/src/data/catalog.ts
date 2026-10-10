@@ -5,6 +5,7 @@ export type Product = {
   vendor: string;
   category: string;
   price: number;
+  stock?: number;
   unit: string;
   accent: string;
   emoji: string;

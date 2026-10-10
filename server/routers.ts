@@ -379,8 +379,15 @@ export const appRouter = router({
       const orderCode = `INV-${Date.now()}`;
       const shipping = await getShippingSettings();
       const productRowsForShipping = input.items.every((item) => item.productId !== undefined)
-        ? await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId, freeShipping: sellerProfiles.freeShipping, sellerLocation: sellerProfiles.currentLocation }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(products.id, item.productId as number)).limit(1)))
+        ? await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId, stock: products.stock, freeShipping: sellerProfiles.freeShipping, sellerLocation: sellerProfiles.currentLocation }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(products.id, item.productId as number)).limit(1)))
         : [];
+      if (input.items.every((item) => item.productId !== undefined)) {
+        input.items.forEach((item, index) => {
+          const product = productRowsForShipping[index]?.[0];
+          if (!product) throw new TRPCError({ code: "NOT_FOUND", message: `Produk ${item.productName} tidak ditemukan.` });
+          if (product.stock < item.quantity) throw new TRPCError({ code: "CONFLICT", message: `Stok ${item.productName} habis atau tidak mencukupi.` });
+        });
+      }
       const freeShipping = productRowsForShipping.length === input.items.length && productRowsForShipping.every((rows) => rows[0]?.freeShipping === 1);
       const pickupLocation = productRowsForShipping.length === input.items.length && productRowsForShipping.every((rows) => rows[0]) && new Set(productRowsForShipping.map((rows) => rows[0]?.sellerLocation || "")).size === 1 ? productRowsForShipping[0]?.[0]?.sellerLocation || null : null;
       const pickupCoordinates = parseCoordinates(pickupLocation);
