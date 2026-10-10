@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole } from "./db";
+import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "./db-tables";
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -267,6 +267,10 @@ export const appRouter = router({
       const whatsapp = normalizePhone(input.whatsapp);
       await db.insert(adminProfiles).values({ name: input.name.trim(), whatsapp, verifiedAt: new Date() }).onConflictDoUpdate({ target: adminProfiles.whatsapp, set: { name: input.name.trim(), verifiedAt: new Date() } });
       return getAdminProfile(whatsapp);
+    }),    updateAdmin: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), name: z.string().trim().min(2).max(160), whatsapp: phone })).mutation(async ({ input }) => {
+      await requireAdminSession(input.sessionToken);
+      try { return await updateAdminProfile(input.id, input.name, normalizePhone(input.whatsapp)); }
+      catch (error) { throw new TRPCError({ code: /sudah terdaftar/i.test(error instanceof Error ? error.message : "") ? "CONFLICT" : "BAD_REQUEST", message: error instanceof Error ? error.message : "Admin belum dapat diperbarui." }); }
     }),
     sellerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
       const db = await dbRequired();

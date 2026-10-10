@@ -208,6 +208,27 @@ export async function listAdminProfiles() {
   const db = await getDb(); if (!db) return [];
   return db.select().from(adminProfiles).orderBy(desc(adminProfiles.createdAt));
 }
+export async function updateAdminProfile(id: number, name: string, whatsapp: string) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  const cleanName = name.trim();
+  await db.transaction(async (tx) => {
+    const currentRows = await tx.select().from(adminProfiles).where(eq(adminProfiles.id, id)).limit(1);
+    if (!currentRows[0]) throw new Error("Admin tidak ditemukan.");
+    const conflict = await tx.select().from(adminProfiles).where(eq(adminProfiles.whatsapp, whatsapp)).limit(1);
+    if (conflict[0] && conflict[0].id !== id) throw new Error("Nomor WhatsApp sudah terdaftar sebagai admin lain.");
+    const oldWhatsapp = currentRows[0].whatsapp;
+    await tx.update(adminProfiles).set({ name: cleanName, whatsapp, updatedAt: new Date() }).where(eq(adminProfiles.id, id));
+    if (oldWhatsapp !== whatsapp) {
+      const oldAccount = await tx.select().from(userAccounts).where(eq(userAccounts.whatsapp, oldWhatsapp)).limit(1);
+      if (oldAccount[0]) {
+        await tx.update(userAccounts).set({ isAdmin: 0, updatedAt: new Date() }).where(eq(userAccounts.whatsapp, oldWhatsapp));
+        if (!oldAccount[0].isBuyer && !oldAccount[0].isSeller && !oldAccount[0].isCourier) await tx.delete(userAccounts).where(eq(userAccounts.whatsapp, oldWhatsapp));
+      }
+    }
+    await tx.insert(userAccounts).values({ whatsapp, displayName: cleanName, isAdmin: 1 }).onConflictDoUpdate({ target: userAccounts.whatsapp, set: { displayName: cleanName, isAdmin: 1, updatedAt: new Date() } });
+  });
+  return getAdminProfile(whatsapp);
+}
 
 export async function upsertAccountRole(whatsapp: string, role: "buyer" | "seller" | "courier" | "admin", displayName: string) {
   const db = await getDb(); if (!db) return null;

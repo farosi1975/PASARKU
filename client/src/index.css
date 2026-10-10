@@ -1287,3 +1287,8 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .buyer-history-empty strong { color: var(--ink); font-size: 11px; }
 .buyer-history-empty .text-link { margin-top: 3px; }
 @media (max-width: 560px) { .buyer-history-main { align-items: start; flex-direction: column; } .buyer-history-total { justify-items: start; } .buyer-history-item { padding: 11px; } }
+.user-action-button.edit { color: #6b5aa4; border-color: #ddd5f1; background: #f6f3ff; }
+.admin-edit-form { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 7px; padding: 10px; margin: -4px 0 9px; border: 1px solid #e6ddf4; border-radius: 9px; background: #faf8ff; }
+.admin-edit-form input { min-width: 0; padding: 8px 9px; border: 1px solid #e3dcd3; border-radius: 7px; color: var(--ink); background: #fff; font-size: 10px; }
+.admin-edit-form .primary-button, .admin-edit-form .outline-button { min-height: 32px; padding: 0 10px; font-size: 9px; }
+@media (max-width: 620px) { .admin-edit-form { grid-template-columns: 1fr 1fr; } .admin-edit-form .primary-button, .admin-edit-form .outline-button { width: 100%; } }
