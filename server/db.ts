@@ -260,6 +260,12 @@ export async function upsertAccountRole(whatsapp: string, role: "buyer" | "selle
 export async function getAccountRoles(whatsapp: string) {
   const db = await getDb(); if (!db) return null;
   const rows = await db.select().from(userAccounts).where(eq(userAccounts.whatsapp, whatsapp)).limit(1);
+  const adminRows = await db.select({ name: adminProfiles.name }).from(adminProfiles).where(eq(adminProfiles.whatsapp, whatsapp)).limit(1);
+  if (adminRows[0] && (!rows[0] || !rows[0].isAdmin)) {
+    await upsertAccountRole(whatsapp, "admin", adminRows[0].name);
+    const refreshed = await db.select().from(userAccounts).where(eq(userAccounts.whatsapp, whatsapp)).limit(1);
+    return refreshed[0] ?? null;
+  }
   return rows[0] ?? null;
 }
 

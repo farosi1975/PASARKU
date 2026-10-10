@@ -265,7 +265,9 @@ export const appRouter = router({
       await requireAdminSession(input.sessionToken);
       const db = await dbRequired();
       const whatsapp = normalizePhone(input.whatsapp);
-      await db.insert(adminProfiles).values({ name: input.name.trim(), whatsapp, verifiedAt: new Date() }).onConflictDoUpdate({ target: adminProfiles.whatsapp, set: { name: input.name.trim(), verifiedAt: new Date() } });
+      const name = input.name.trim();
+      await db.insert(adminProfiles).values({ name, whatsapp, verifiedAt: new Date() }).onConflictDoUpdate({ target: adminProfiles.whatsapp, set: { name, verifiedAt: new Date() } });
+      await upsertAccountRole(whatsapp, "admin", name);
       return getAdminProfile(whatsapp);
     }),    updateAdmin: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), name: z.string().trim().min(2).max(160), whatsapp: phone })).mutation(async ({ input }) => {
       await requireAdminSession(input.sessionToken);
