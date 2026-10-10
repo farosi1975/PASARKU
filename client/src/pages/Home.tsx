@@ -25,6 +25,7 @@ type PromoSlot = { id: string; title: string; description: string; cta: string; 
 
 function Header({ onCart, logoUrl, brandName }: { onCart: () => void; logoUrl?: string | null; brandName: string }) {
   const { count } = useCart();
+  const [, navigate] = useLocation();
   const [userName, setUserName] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   useEffect(() => {
@@ -44,6 +45,7 @@ function Header({ onCart, logoUrl, brandName }: { onCart: () => void; logoUrl?: 
     setProfileOpen(false);
     window.dispatchEvent(new Event(AUTH_EVENT));
     toast.success("Anda sudah keluar", { description: "Sesi pengguna di browser ini telah dihapus." });
+    navigate("/masuk");
   };
   return (
     <header className="site-header">
