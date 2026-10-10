@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole } from "./db";
+import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminProfile, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "./db-tables";
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -271,6 +271,10 @@ export const appRouter = router({
       await requireAdminSession(input.sessionToken);
       try { return await updateAdminProfile(input.id, input.name, normalizePhone(input.whatsapp)); }
       catch (error) { throw new TRPCError({ code: /sudah terdaftar/i.test(error instanceof Error ? error.message : "") ? "CONFLICT" : "BAD_REQUEST", message: error instanceof Error ? error.message : "Admin belum dapat diperbarui." }); }
+    }),    deleteAdmin: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive() })).mutation(async ({ input }) => {
+      const admin = await requireAdminSession(input.sessionToken);
+      try { return await deleteAdminProfile(input.id, { name: admin.name, whatsapp: admin.whatsapp }); }
+      catch (error) { throw new TRPCError({ code: /terakhir|dirinya sendiri/i.test(error instanceof Error ? error.message : "") ? "CONFLICT" : "BAD_REQUEST", message: error instanceof Error ? error.message : "Admin belum dapat dihapus." }); }
     }),
     sellerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
       const db = await dbRequired();

@@ -1292,3 +1292,5 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .admin-edit-form input { min-width: 0; padding: 8px 9px; border: 1px solid #e3dcd3; border-radius: 7px; color: var(--ink); background: #fff; font-size: 10px; }
 .admin-edit-form .primary-button, .admin-edit-form .outline-button { min-height: 32px; padding: 0 10px; font-size: 9px; }
 @media (max-width: 620px) { .admin-edit-form { grid-template-columns: 1fr 1fr; } .admin-edit-form .primary-button, .admin-edit-form .outline-button { width: 100%; } }
+
+.admin-edit-delete { min-height: 32px; }

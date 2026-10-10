@@ -230,6 +230,25 @@ export async function updateAdminProfile(id: number, name: string, whatsapp: str
   return getAdminProfile(whatsapp);
 }
 
+export async function deleteAdminProfile(id: number, admin: { name: string; whatsapp: string }) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  await db.transaction(async (tx) => {
+    const allAdmins = await tx.select().from(adminProfiles);
+    if (allAdmins.length <= 1) throw new Error("Admin terakhir tidak dapat dihapus.");
+    const targetRows = await tx.select().from(adminProfiles).where(eq(adminProfiles.id, id)).limit(1);
+    const target = targetRows[0];
+    if (!target) throw new Error("Admin tidak ditemukan.");
+    if (target.whatsapp === admin.whatsapp) throw new Error("Admin yang sedang digunakan tidak dapat menghapus dirinya sendiri.");
+    await tx.delete(adminProfiles).where(eq(adminProfiles.id, id));
+    const accountRows = await tx.select().from(userAccounts).where(eq(userAccounts.whatsapp, target.whatsapp)).limit(1);
+    if (accountRows[0]) {
+      await tx.update(userAccounts).set({ isAdmin: 0, updatedAt: new Date() }).where(eq(userAccounts.whatsapp, target.whatsapp));
+      if (!accountRows[0].isBuyer && !accountRows[0].isSeller && !accountRows[0].isCourier) await tx.delete(userAccounts).where(eq(userAccounts.whatsapp, target.whatsapp));
+    }
+    await tx.insert(adminAuditLogs).values({ adminName: admin.name, adminWhatsapp: admin.whatsapp, action: "delete_admin", targetRole: "admin", targetId: id, targetName: target.name, details: `Admin ${target.name} dan akses OTP nomor +${target.whatsapp} dihapus.` });
+  });
+  return { success: true as const, id };
+}
 export async function upsertAccountRole(whatsapp: string, role: "buyer" | "seller" | "courier" | "admin", displayName: string) {
   const db = await getDb(); if (!db) return null;
   const roleField = { buyer: "isBuyer", seller: "isSeller", courier: "isCourier", admin: "isAdmin" }[role];
