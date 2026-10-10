@@ -138,6 +138,23 @@ const notifyVerificationResult = async (target: string, role: "seller" | "courie
     return { sent: false as const, statusText };
   }
 };
+const notifySellerOrderCancelled = async (db: any, orderCode: string) => {
+  try {
+    const order = await db.select({ id: orders.id, customerName: orders.customerName }).from(orders).where(eq(orders.orderCode, orderCode)).limit(1);
+    if (!order[0]) return;
+    const sellers = await db.select({ whatsapp: sellerProfiles.whatsapp, shopName: sellerProfiles.shopName }).from(orderItems).innerJoin(products, eq(orderItems.productId, products.id)).innerJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(orderItems.orderId, order[0].id));
+    const uniqueSellers: Array<{ whatsapp: string; shopName: string }> = Array.from(new Map<string, { whatsapp: string; shopName: string }>(sellers.map((seller: { whatsapp: string; shopName: string }) => [seller.whatsapp, seller])).values());
+    await Promise.all(uniqueSellers.map(async (seller) => {
+      try {
+        await sendFonnteMessage(seller.whatsapp, `PASARKU: Pesanan ${orderCode} dari ${order[0].customerName} telah DIBATALKAN. Stok produk terkait sudah dikembalikan bila pesanan sebelumnya dikonfirmasi. Silakan cek portal toko.`);
+      } catch (error) {
+        console.error(`[FONNTE] Notifikasi pembatalan ke ${seller.shopName} gagal:`, error instanceof Error ? error.message : error);
+      }
+    }));
+  } catch (error) {
+    console.error("[FONNTE] Pengambilan penjual untuk notifikasi pembatalan gagal:", error instanceof Error ? error.message : error);
+  }
+};
 const notifyCourierAssignment = async (target: string, orderCode: string, total: number, source: "otomatis" | "Admin") => {
   const message = `PASARKU: Pesanan ${orderCode} telah ditugaskan ${source === "otomatis" ? "secara otomatis berdasarkan pilihan toko" : "oleh Admin"} kepada Anda. Total COD: Rp${total.toLocaleString("id-ID")}. Buka portal kurir untuk menerima dan mengantar tugas.`;
   try {
@@ -554,8 +571,8 @@ export const appRouter = router({
       await db.update(orders).set({ status: "Diproses", courierAcceptedAt: new Date() }).where(eq(orders.id, order[0].id));
       return { success: true as const, orderCode: input.orderCode, status: "Diproses" as const };
     }),
-    updateOrderStatus: publicProcedure.input(z.object({ orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { const db = await dbRequired(); if (input.status === "Diproses" || input.status === "Dibatalkan") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); if (input.status === "Diproses") await deductStockForConfirmedOrder(tx, input.orderCode); else await restoreStockForCancelledOrder(tx, input.orderCode); }); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); } return getOrderWithItems(input.orderCode); }),
-    updateAdminOrderStatus: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); if (input.status === "Diproses" || input.status === "Dibatalkan") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); if (input.status === "Diproses") await deductStockForConfirmedOrder(tx, input.orderCode); else await restoreStockForCancelledOrder(tx, input.orderCode); }); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); } return getOrderWithItems(input.orderCode); }),
+    updateOrderStatus: publicProcedure.input(z.object({ orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { const db = await dbRequired(); if (input.status === "Diproses" || input.status === "Dibatalkan") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); if (input.status === "Diproses") await deductStockForConfirmedOrder(tx, input.orderCode); else await restoreStockForCancelledOrder(tx, input.orderCode); }); if (input.status === "Dibatalkan") void notifySellerOrderCancelled(db, input.orderCode); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); } return getOrderWithItems(input.orderCode); }),
+    updateAdminOrderStatus: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); if (input.status === "Diproses" || input.status === "Dibatalkan") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); if (input.status === "Diproses") await deductStockForConfirmedOrder(tx, input.orderCode); else await restoreStockForCancelledOrder(tx, input.orderCode); }); if (input.status === "Dibatalkan") void notifySellerOrderCancelled(db, input.orderCode); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); } return getOrderWithItems(input.orderCode); }),
     confirmDelivery: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).mutation(async ({ input }) => { const db = await dbRequired(); await db.update(orders).set({ status: "Selesai" }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
   }),
 });
