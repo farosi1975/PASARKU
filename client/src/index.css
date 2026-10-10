@@ -1260,3 +1260,27 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .store-product-grid .product-body { padding:12px; }
   .store-product-grid .product-name { font-size:.95rem; }
 }
+.buyer-order-history { display: grid; gap: 14px; padding: 20px; margin-top: 18px; border: 1px solid #eadfd5; border-radius: 16px; background: #fffdf9; }
+.buyer-history-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; color: var(--orange); }
+.buyer-history-heading h2 { margin: 4px 0 4px; color: var(--ink); font-family: "Space Grotesk", sans-serif; font-size: 20px; letter-spacing: -.04em; }
+.buyer-history-heading p { margin: 0; color: #8e857c; font-size: 10px; line-height: 1.5; }
+.buyer-history-list { display: grid; gap: 9px; }
+.buyer-history-item { display: grid; gap: 10px; padding: 13px; border: 1px solid #eee5dc; border-radius: 12px; background: #fff; }
+.buyer-history-main { display: flex; justify-content: space-between; gap: 12px; }
+.buyer-history-main strong, .buyer-history-main small, .buyer-history-main span { display: block; }
+.buyer-history-main strong { color: var(--ink); font-size: 11px; }
+.buyer-history-main small { margin-top: 3px; color: #a19a91; font-size: 8px; }
+.buyer-history-main span { margin-top: 7px; color: #77716a; font-size: 9px; line-height: 1.4; }
+.buyer-history-total { display: grid; align-content: start; justify-items: end; gap: 7px; white-space: nowrap; }
+.buyer-history-total b { font-size: 11px; }
+.buyer-order-status { padding: 4px 7px; border-radius: 6px; font-size: 8px; font-weight: 800; }
+.buyer-order-status.active { color: #9a5c20; background: #fff0d8; }
+.buyer-order-status.done { color: #397a4d; background: #e9f4e9; }
+.buyer-order-status.cancelled { color: #b85a4a; background: #fff0ed; }
+.buyer-history-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 9px; border-top: 1px solid #f1ece6; }
+.buyer-history-actions .outline-button, .buyer-history-actions .order-cancel-button { min-height: 32px; font-size: 9px; }
+.buyer-cancelled-note { display: inline-flex; align-items: center; gap: 5px; color: #b85a4a; font-size: 9px; font-weight: 800; }
+.buyer-history-empty { display: grid; justify-items: start; gap: 6px; padding: 16px; border: 1px dashed #e4d2c7; border-radius: 12px; color: #8e776b; background: #fff8f2; font-size: 10px; }
+.buyer-history-empty strong { color: var(--ink); font-size: 11px; }
+.buyer-history-empty .text-link { margin-top: 3px; }
+@media (max-width: 560px) { .buyer-history-main { align-items: start; flex-direction: column; } .buyer-history-total { justify-items: start; } .buyer-history-item { padding: 11px; } }

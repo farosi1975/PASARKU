@@ -235,6 +235,11 @@ export async function getOrderWithItems(orderCode: string) {
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, found[0].id));
   return { ...found[0], items };
 }
+export async function listBuyerOrders(whatsapp: string) {
+  const db = await getDb(); if (!db) return [];
+  const rows = await db.select().from(orders).where(eq(orders.whatsapp, whatsapp)).orderBy(desc(orders.createdAt));
+  return Promise.all(rows.map(async (order) => ({ ...order, items: await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)) })));
+}
 
 export async function listCourierOrders(courierId: number) {
   const db = await getDb(); if (!db) return [];
