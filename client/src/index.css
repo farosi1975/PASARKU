@@ -495,6 +495,10 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .order-preview-note > span { color: var(--orange); font-size: 15px; }
 .order-preview-note p { margin: 1px 0 0; font-size: 9px; line-height: 1.5; }
 .order-footer-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; max-width: 730px; padding-top: 22px; }
+.order-cancel-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 0 13px; border: 1px solid #efcfc7; border-radius: 10px; color: #b85a4a; background: #fff5f2; font-size: 11px; font-weight: 800; cursor: pointer; }
+.order-cancel-button:hover { background: #ffeae5; }
+.order-cancel-button:disabled { opacity: .6; cursor: wait; }
+.order-cancelled-label { display: inline-flex; align-items: center; gap: 7px; color: #b85a4a; font-size: 11px; font-weight: 800; }
 .dark-link { color: #746d64; }
 .dark-link:hover { color: var(--orange); }
 .order-empty { min-height: calc(100vh - 76px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; }

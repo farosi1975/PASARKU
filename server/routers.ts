@@ -571,6 +571,21 @@ export const appRouter = router({
       await db.update(orders).set({ status: "Diproses", courierAcceptedAt: new Date() }).where(eq(orders.id, order[0].id));
       return { success: true as const, orderCode: input.orderCode, status: "Diproses" as const };
     }),
+    cancelOrder: publicProcedure.input(z.object({ orderCode: z.string().min(3), whatsapp: phone })).mutation(async ({ input }) => {
+      const db = await dbRequired();
+      const rows = await db.select().from(orders).where(eq(orders.orderCode, input.orderCode)).limit(1);
+      const order = rows[0];
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Pesanan tidak ditemukan." });
+      if (normalizePhone(order.whatsapp) !== normalizePhone(input.whatsapp)) throw new TRPCError({ code: "FORBIDDEN", message: "Pesanan ini bukan milik nomor WhatsApp tersebut." });
+      if (order.status === "Selesai" || order.status === "Dibatalkan") throw new TRPCError({ code: "CONFLICT", message: order.status === "Selesai" ? "Pesanan yang sudah selesai tidak dapat dibatalkan." : "Pesanan ini sudah dibatalkan." });
+      if (order.status === "Diantar") throw new TRPCError({ code: "CONFLICT", message: "Pesanan yang sedang diantar tidak dapat dibatalkan. Hubungi Admin PASARKU segera." });
+      await db.transaction(async (tx: any) => {
+        await tx.update(orders).set({ status: "Dibatalkan", updatedAt: new Date() }).where(and(eq(orders.id, order.id), eq(orders.status, order.status)));
+        await restoreStockForCancelledOrder(tx, input.orderCode);
+      });
+      void notifySellerOrderCancelled(db, input.orderCode);
+      return getOrderWithItems(input.orderCode);
+    }),
     updateOrderStatus: publicProcedure.input(z.object({ orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { const db = await dbRequired(); if (input.status === "Diproses" || input.status === "Dibatalkan") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); if (input.status === "Diproses") await deductStockForConfirmedOrder(tx, input.orderCode); else await restoreStockForCancelledOrder(tx, input.orderCode); }); if (input.status === "Dibatalkan") void notifySellerOrderCancelled(db, input.orderCode); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); } return getOrderWithItems(input.orderCode); }),
     updateAdminOrderStatus: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); if (input.status === "Diproses" || input.status === "Dibatalkan") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); if (input.status === "Diproses") await deductStockForConfirmedOrder(tx, input.orderCode); else await restoreStockForCancelledOrder(tx, input.orderCode); }); if (input.status === "Dibatalkan") void notifySellerOrderCancelled(db, input.orderCode); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); } return getOrderWithItems(input.orderCode); }),
     confirmDelivery: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).mutation(async ({ input }) => { const db = await dbRequired(); await db.update(orders).set({ status: "Selesai" }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
