@@ -198,6 +198,7 @@ export const orders = mysqlTable("orders", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   stockDeductedAt: timestamp("stockDeductedAt"),
+  stockRestoredAt: timestamp("stockRestoredAt"),
 });
 
 export const orderItems = mysqlTable("order_items", {

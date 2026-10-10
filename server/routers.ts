@@ -28,6 +28,18 @@ const deductStockForConfirmedOrder = async (tx: any, orderCode: string) => {
   }
   return { deducted: true };
 };
+const restoreStockForCancelledOrder = async (tx: any, orderCode: string) => {
+  const current = await tx.select({ id: orders.id, status: orders.status, stockDeductedAt: orders.stockDeductedAt, stockRestoredAt: orders.stockRestoredAt }).from(orders).where(eq(orders.orderCode, orderCode)).limit(1);
+  if (!current[0] || current[0].status !== "Dibatalkan" || !current[0].stockDeductedAt || current[0].stockRestoredAt) return { restored: false };
+  const claimed = await tx.update(orders).set({ stockRestoredAt: new Date(), updatedAt: new Date() }).where(and(eq(orders.id, current[0].id), eq(orders.status, "Dibatalkan"), isNull(orders.stockRestoredAt)));
+  if (!affectedRows(claimed)) return { restored: false };
+  const items = await tx.select({ productId: orderItems.productId, quantity: orderItems.quantity }).from(orderItems).where(eq(orderItems.orderId, current[0].id));
+  for (const item of items) {
+    if (!item.productId) continue;
+    await tx.update(products).set({ stock: sql`${products.stock} + ${item.quantity}`, updatedAt: new Date() }).where(eq(products.id, item.productId));
+  }
+  return { restored: true };
+};
 const adminSessionToken = z.string().min(32).max(128);
 const OTP_COOLDOWN_MS = 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
@@ -543,7 +555,7 @@ export const appRouter = router({
       return { success: true as const, orderCode: input.orderCode, status: "Diproses" as const };
     }),
     updateOrderStatus: publicProcedure.input(z.object({ orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { const db = await dbRequired(); await db.update(orders).set({ status: input.status }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
-    updateAdminOrderStatus: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); if (input.status === "Diproses") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); await deductStockForConfirmedOrder(tx, input.orderCode); }); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); } return getOrderWithItems(input.orderCode); }),
+    updateAdminOrderStatus: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); if (input.status === "Diproses" || input.status === "Dibatalkan") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); if (input.status === "Diproses") await deductStockForConfirmedOrder(tx, input.orderCode); else await restoreStockForCancelledOrder(tx, input.orderCode); }); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); } return getOrderWithItems(input.orderCode); }),
     confirmDelivery: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).mutation(async ({ input }) => { const db = await dbRequired(); await db.update(orders).set({ status: "Selesai" }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
   }),
 });

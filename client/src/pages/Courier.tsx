@@ -13,7 +13,7 @@ import { OrderPrintActions } from "@/components/OrderPrintActions";
 
 type Panel = "tasks" | "settings";
 type AuthMode = "login" | "register";
-const statusMeta: Record<OrderStatus, { label: string; className: string }> = { Menunggu: { label: "Menunggu diterima", className: "waiting" }, Diproses: { label: "Siap diambil", className: "processing" }, Diantar: { label: "Dalam perjalanan", className: "shipping" }, Selesai: { label: "Selesai", className: "done" } };
+const statusMeta: Record<OrderStatus, { label: string; className: string }> = { Menunggu: { label: "Menunggu diterima", className: "waiting" }, Diproses: { label: "Siap diambil", className: "processing" }, Diantar: { label: "Dalam perjalanan", className: "shipping" }, Selesai: { label: "Selesai", className: "done" }, Dibatalkan: { label: "Dibatalkan", className: "cancelled" } };
 function nextStep(order: MockOrder): { label: string; status: OrderStatus } | null { if (order.status === "Menunggu") return { label: "Terima tugas", status: "Diproses" }; if (order.status === "Diproses") return { label: "Tandai barang diambil", status: "Diantar" }; if (order.status === "Diantar") return { label: "Barang diterima pembeli", status: "Selesai" }; return null; }
 
 export default function Courier() {

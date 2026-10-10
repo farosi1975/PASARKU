@@ -22,7 +22,7 @@ export type Product = {
   closingTime?: string;
 };
 
-export type OrderStatus = "Menunggu" | "Diproses" | "Diantar" | "Selesai";
+export type OrderStatus = "Menunggu" | "Diproses" | "Diantar" | "Selesai" | "Dibatalkan";
 
 export type MockOrder = {
   id: string;
