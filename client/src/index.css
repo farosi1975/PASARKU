@@ -1264,6 +1264,9 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .buyer-history-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; color: var(--orange); }
 .buyer-history-heading h2 { margin: 4px 0 4px; color: var(--ink); font-family: "Space Grotesk", sans-serif; font-size: 20px; letter-spacing: -.04em; }
 .buyer-history-heading p { margin: 0; color: #8e857c; font-size: 10px; line-height: 1.5; }
+.buyer-history-filters { display: flex; gap: 6px; padding: 4px; border-radius: 10px; background: #f6f0ea; }
+.buyer-history-filters button { flex: 1; min-height: 31px; padding: 0 8px; border: 0; border-radius: 7px; color: #93877d; background: transparent; font-size: 9px; font-weight: 800; cursor: pointer; }
+.buyer-history-filters button.active { color: var(--orange-dark); background: #fff; box-shadow: 0 2px 7px rgba(99,57,39,.08); }
 .buyer-history-list { display: grid; gap: 9px; }
 .buyer-history-item { display: grid; gap: 10px; padding: 13px; border: 1px solid #eee5dc; border-radius: 12px; background: #fff; }
 .buyer-history-main { display: flex; justify-content: space-between; gap: 12px; }
