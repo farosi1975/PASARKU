@@ -903,6 +903,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .user-action-button { border: 0; border-radius: 7px; padding: 7px 9px; font-size: 9px; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .user-action-button.block { color: #a64b37; background: #fff0eb; }
 .user-action-button.restore { color: #38745e; background: #e7f5ed; }
+.user-action-button.delete { color: #a33d32; background: #fff0ed; }
 .user-action-button:disabled { cursor: wait; opacity: .55; }
 @media (max-width: 760px) { .admin-users-panel { overflow: hidden; } .admin-users-table { min-width: 700px; } }
 

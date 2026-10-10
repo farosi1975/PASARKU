@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, getPublicStoreDetail, getSiteSettings, listAdminProfiles, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole } from "./db";
+import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, getPublicStoreDetail, getSiteSettings, listAdminProfiles, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "./db-tables";
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -444,6 +444,14 @@ export const appRouter = router({
       return { url: key ? await storageGetSignedUrl(key) : legacyUrl };
     }),
     resetNonAdminData: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return resetMarketplaceData(); }),
+    deleteUser: publicProcedure.input(z.object({ sessionToken: adminSessionToken, role: z.enum(["buyer", "seller", "courier"]), id: z.number().int().positive() })).mutation(async ({ input }) => {
+      await requireAdminSession(input.sessionToken);
+      try { return await deleteMarketplaceUser(input.role, input.id); }
+      catch (error) {
+        if (error instanceof Error && /tidak ditemukan/i.test(error.message)) throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error instanceof Error ? error.message : "User belum dapat dihapus." });
+      }
+    }),
     manageUserAccess: publicProcedure.input(z.object({ sessionToken: adminSessionToken, role: z.enum(["buyer", "seller", "courier"]), id: z.number().int().positive(), action: z.enum(["ban", "unban"]) })).mutation(async ({ input }) => {
       await requireAdminSession(input.sessionToken);
       const db = await dbRequired();

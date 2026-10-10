@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { drizzle as drizzlePostgres } from "drizzle-orm/node-postgres";
 import { drizzle as drizzleMySql } from "drizzle-orm/mysql2";
 import { Pool } from "pg";
@@ -307,6 +307,49 @@ export async function resetMarketplaceData() {
     await tx.delete(userAccounts).where(eq(userAccounts.isAdmin, 0));
   });
   return { success: true as const };
+}
+
+export async function deleteMarketplaceUser(role: "buyer" | "seller" | "courier", id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database belum tersedia.");
+  const roleField = { buyer: "isBuyer", seller: "isSeller", courier: "isCourier" }[role] as "isBuyer" | "isSeller" | "isCourier";
+  let whatsapp: string | null = null;
+  await db.transaction(async (tx) => {
+    if (role === "buyer") {
+      const rows = await tx.select({ whatsapp: buyerProfiles.whatsapp }).from(buyerProfiles).where(eq(buyerProfiles.id, id)).limit(1);
+      if (!rows[0]) throw new Error("Data pembeli tidak ditemukan.");
+      whatsapp = rows[0].whatsapp;
+      await tx.delete(buyerProfiles).where(eq(buyerProfiles.id, id));
+    } else if (role === "seller") {
+      const rows = await tx.select({ whatsapp: sellerProfiles.whatsapp }).from(sellerProfiles).where(eq(sellerProfiles.id, id)).limit(1);
+      if (!rows[0]) throw new Error("Data toko tidak ditemukan.");
+      whatsapp = rows[0].whatsapp;
+      const sellerProducts = await tx.select({ id: products.id }).from(products).where(eq(products.sellerId, id));
+      const productIds = sellerProducts.map((item) => item.id);
+      if (productIds.length) {
+        await tx.update(orderItems).set({ productId: null }).where(inArray(orderItems.productId, productIds));
+        await tx.delete(products).where(inArray(products.id, productIds));
+      }
+      await tx.delete(sellerProfiles).where(eq(sellerProfiles.id, id));
+    } else {
+      const rows = await tx.select({ whatsapp: courierProfiles.whatsapp }).from(courierProfiles).where(eq(courierProfiles.id, id)).limit(1);
+      if (!rows[0]) throw new Error("Data kurir tidak ditemukan.");
+      whatsapp = rows[0].whatsapp;
+      await tx.update(orders).set({ courierId: null }).where(eq(orders.courierId, id));
+      await tx.delete(courierProfiles).where(eq(courierProfiles.id, id));
+    }
+    if (whatsapp) {
+      const accountRows = await tx.select().from(userAccounts).where(eq(userAccounts.whatsapp, whatsapp)).limit(1);
+      const account = accountRows[0];
+      if (account) {
+        await tx.update(userAccounts).set({ [roleField]: 0, updatedAt: new Date() }).where(eq(userAccounts.whatsapp, whatsapp));
+        const remaining = await tx.select().from(userAccounts).where(eq(userAccounts.whatsapp, whatsapp)).limit(1);
+        const next = remaining[0];
+        if (next && !next.isBuyer && !next.isSeller && !next.isCourier && !next.isAdmin) await tx.delete(userAccounts).where(eq(userAccounts.whatsapp, whatsapp));
+      }
+    }
+  });
+  return { success: true as const, role, id };
 }
 
 export async function getDashboardStats() {

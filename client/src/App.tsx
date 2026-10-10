@@ -4,7 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
-import PreviewGate from "./components/PreviewGate";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { CartProvider } from "./contexts/CartContext";
 import Home from "./pages/Home";
@@ -35,7 +34,7 @@ function Router() {
 }
 
 function App() {
-  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><PwaInstallPrompt /><PreviewGate><VisitorTracker /><CartProvider><Router /></CartProvider></PreviewGate></TooltipProvider></ThemeProvider></ErrorBoundary>;
+  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><PwaInstallPrompt /><VisitorTracker /><CartProvider><Router /></CartProvider></TooltipProvider></ThemeProvider></ErrorBoundary>;
 }
 
 export default App;
