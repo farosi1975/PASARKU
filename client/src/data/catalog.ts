@@ -40,6 +40,7 @@ export type MockOrder = {
   note?: string;
   total: number;
   items: number;
+  orderItems?: { name: string; price: number; quantity: number }[];
   payment: "COD" | "Transfer";
   status: OrderStatus;
   time: string;

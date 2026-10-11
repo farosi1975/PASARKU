@@ -32,6 +32,16 @@ const wrapMySqlDatabase = (database: any): CompatibleDatabase => new Proxy(datab
     return typeof value === "function" ? value.bind(target) : value;
   },
 }) as CompatibleDatabase;
+const ensureMySqlRuntimeColumns = async () => {
+  if (!_mysqlPool) return;
+  for (const column of ["stockDeductedAt", "stockRestoredAt"]) {
+    try { await _mysqlPool.query(`ALTER TABLE orders ADD COLUMN ${column} timestamp NULL`); }
+    catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code !== "ER_DUP_FIELDNAME") console.warn(`[Database] Kolom ${column} belum dapat disiapkan:`, error instanceof Error ? error.message : error);
+    }
+  }
+};
 
 export async function getDb(): Promise<CompatibleDatabase | null> {
   if (!_db && process.env.DATABASE_URL) {
@@ -39,6 +49,7 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
       if (databaseDialect === "mysql") {
         _mysqlPool = createMySqlPool(process.env.DATABASE_URL);
         _db = wrapMySqlDatabase(drizzleMySql(_mysqlPool));
+        await ensureMySqlRuntimeColumns();
       } else {
         _pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined });
         _db = drizzlePostgres(_pool);
@@ -259,19 +270,26 @@ export async function upsertAccountRole(whatsapp: string, role: "buyer" | "selle
 
 export async function getAccountRoles(whatsapp: string) {
   const db = await getDb(); if (!db) return null;
-  const rows = await db.select().from(userAccounts).where(eq(userAccounts.whatsapp, whatsapp)).limit(1);
-  const adminRows = await db.select({ name: adminProfiles.name }).from(adminProfiles).where(eq(adminProfiles.whatsapp, whatsapp)).limit(1);
-  if (adminRows[0] && (!rows[0] || !rows[0].isAdmin)) {
-    await upsertAccountRole(whatsapp, "admin", adminRows[0].name);
-    const refreshed = await db.select().from(userAccounts).where(eq(userAccounts.whatsapp, whatsapp)).limit(1);
-    return refreshed[0] ?? null;
+  let rows = await db.select().from(userAccounts).where(eq(userAccounts.whatsapp, whatsapp)).limit(1);
+  const [buyer, seller, courier, admin] = await Promise.all([
+    db.select({ name: buyerProfiles.name }).from(buyerProfiles).where(eq(buyerProfiles.whatsapp, whatsapp)).limit(1),
+    db.select({ name: sellerProfiles.ownerName }).from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1),
+    db.select({ name: courierProfiles.name }).from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1),
+    db.select({ name: adminProfiles.name }).from(adminProfiles).where(eq(adminProfiles.whatsapp, whatsapp)).limit(1),
+  ]);
+  const discovered = buyer[0] ? ["buyer", buyer[0].name] : seller[0] ? ["seller", seller[0].name] : courier[0] ? ["courier", courier[0].name] : admin[0] ? ["admin", admin[0].name] : null;
+  if (!rows[0] && discovered) await upsertAccountRole(whatsapp, discovered[0] as any, discovered[1]);
+  for (const [role, name] of [["buyer", buyer[0]?.name], ["seller", seller[0]?.name], ["courier", courier[0]?.name], ["admin", admin[0]?.name]] as const) {
+    if (name && (!rows[0] || !rows[0][({ buyer: "isBuyer", seller: "isSeller", courier: "isCourier", admin: "isAdmin" } as const)[role]])) await upsertAccountRole(whatsapp, role, name);
   }
+  if (!rows[0] || discovered) rows = await db.select().from(userAccounts).where(eq(userAccounts.whatsapp, whatsapp)).limit(1);
   return rows[0] ?? null;
 }
 
 export async function listOrders() {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(orders).orderBy(desc(orders.createdAt));
+  const rows = await db.select().from(orders).orderBy(desc(orders.createdAt));
+  return Promise.all(rows.map(async (order) => ({ ...order, items: await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)) })));
 }
 
 export async function getOrderWithItems(orderCode: string) {
@@ -303,6 +321,7 @@ export async function listCourierOrders(courierId: number) {
       pickupShopName: seller?.shopName ?? "Penjual PASARKU",
       pickupVillage: seller?.village ?? "Sawahan",
       pickupLocation: seller?.currentLocation ?? order.pickupLocation,
+      items: await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
     };
   }));
 }

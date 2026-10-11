@@ -40,13 +40,14 @@ const restoreStockForCancelledOrder = async (tx: any, orderCode: string) => {
   }
   return { restored: true };
 };
-const adminSessionToken = z.string().min(32).max(128);
+const adminSessionToken = z.string().min(32).max(256);
 const OTP_COOLDOWN_MS = 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_TTL_MS = 5 * 60 * 1000;
 const otpLastSent = new Map<string, number>();
 const adminChallenges = new Map<string, { otp: string; expiresAt: number; attempts: number }>();
 const adminSessions = new Map<string, { whatsapp: string; expiresAt: number }>();
+const ADMIN_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const buyerChallenges = new Map<string, { otp: string; name?: string; expiresAt: number; attempts: number }>();
 const sellerChallenges = new Map<string, { otp: string; shopName: string; ownerName: string; village: string; expiresAt: number; attempts: number }>();
 const courierChallenges = new Map<string, { otp: string; name: string; vehicle: string; expiresAt: number; attempts: number }>();
@@ -117,8 +118,22 @@ const invalidOtp = (challenge: { attempts: number }, message: string) => {
   challenge.attempts += 1;
   return new TRPCError({ code: "UNAUTHORIZED", message: challenge.attempts >= OTP_MAX_ATTEMPTS ? "Batas 5 percobaan tercapai. Minta OTP baru setelah cooldown." : `${message} Percobaan tersisa ${OTP_MAX_ATTEMPTS - challenge.attempts}.` });
 };
+const createAdminSessionToken = (whatsapp: string) => {
+  const payload = Buffer.from(JSON.stringify({ scope: "admin-session", whatsapp, expiresAt: Date.now() + ADMIN_SESSION_TTL_MS })).toString("base64url");
+  return `${payload}.${otpSignature(payload)}`;
+};
+const readAdminSessionToken = (token: string) => {
+  try {
+    const [payload, signature] = token.split(".");
+    const expected = otpSignature(payload);
+    if (!payload || !signature || expected.length !== signature.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) return null;
+    const value = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { scope?: string; whatsapp?: string; expiresAt?: number };
+    return value.scope === "admin-session" && value.whatsapp && value.expiresAt && value.expiresAt >= Date.now() ? value : null;
+  } catch { return null; }
+};
 const requireAdminSession = async (token: string) => {
-  const session = adminSessions.get(token);
+  const signed = readAdminSessionToken(token);
+  const session = signed ? { whatsapp: signed.whatsapp!, expiresAt: signed.expiresAt! } : adminSessions.get(token);
   if (!session || session.expiresAt < Date.now()) { adminSessions.delete(token); throw new TRPCError({ code: "UNAUTHORIZED", message: "Sesi admin berakhir. Silakan masuk kembali." }); }
   const profile = await getAdminProfile(session.whatsapp);
   if (!profile) { adminSessions.delete(token); throw new TRPCError({ code: "FORBIDDEN", message: "Admin tidak terverifikasi." }); }
@@ -255,8 +270,8 @@ export const appRouter = router({
       if (!profile) throw new TRPCError({ code: "FORBIDDEN", message: "Admin tidak terverifikasi." });
       adminChallenges.delete(whatsapp);
       await upsertAccountRole(whatsapp, "admin", profile.name);
-      const sessionToken = randomBytes(32).toString("hex");
-      adminSessions.set(sessionToken, { whatsapp, expiresAt: Date.now() + 8 * 60 * 60 * 1000 });
+      const sessionToken = createAdminSessionToken(whatsapp);
+      adminSessions.set(sessionToken, { whatsapp, expiresAt: Date.now() + ADMIN_SESSION_TTL_MS });
       return { sessionToken, admin: profile };
     }),
     adminLogout: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).mutation(({ input }) => { adminSessions.delete(input.sessionToken); return { success: true } as const; }),
