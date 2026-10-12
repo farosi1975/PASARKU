@@ -853,6 +853,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .verified-courier-row strong { color: var(--ink); font-size: 10px; }
 .verified-courier-row small { margin-top: 3px; color: var(--muted); font-size: 8px; }
 .courier-ready-badge { padding: 4px 6px; border-radius: 6px; color: var(--green-dark); background: #eaf6eb; font-size: 7px; font-weight: 800; }
+.verified-courier-delete { padding: 5px 7px; font-size: 7px; }
 .verified-courier-empty { padding: 15px 0; color: var(--muted); font-size: 9px; text-align: center; }
 .courier-auth-switch { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 15px; color: #948c83; font-size: 8px; }
 .courier-auth-switch button { padding: 0; border: 0; color: var(--orange-dark); background: transparent; font-size: 8px; font-weight: 800; }
