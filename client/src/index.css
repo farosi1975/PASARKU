@@ -1296,3 +1296,10 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 @media (max-width: 620px) { .admin-edit-form { grid-template-columns: 1fr 1fr; } .admin-edit-form .primary-button, .admin-edit-form .outline-button { width: 100%; } }
 
 .admin-edit-delete { min-height: 32px; }
+
+/* Inline preview foto identitas pada tabel verifikasi Admin. */
+.document-preview-card { display: inline-flex; align-items: center; gap: 6px; margin: 0 5px 5px 0; vertical-align: middle; }
+.document-preview-button { display: block; width: 48px; height: 48px; padding: 0; overflow: hidden; border: 1px solid #ead8ce; border-radius: 8px; background: #fffaf6; cursor: zoom-in; }
+.document-preview-image { display: block; width: 100%; height: 100%; object-fit: cover; }
+.document-preview-button:hover { border-color: var(--orange); box-shadow: 0 3px 10px rgba(224, 99, 55, .2); }
+.document-preview-loading, .document-preview-missing { display: inline-block; margin: 0 5px 5px 0; color: #a58e83; font-size: 9px; }

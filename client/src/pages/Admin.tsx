@@ -38,13 +38,19 @@ function storeAdminSession(session: AdminSession | null) {
 }
 
 function AdminDocumentLink({ sessionToken, role, id, kind, label }: { sessionToken: string; role: "seller" | "courier"; id: number; kind: "identity" | "selfie"; label: string }) {
-  const document = trpc.marketplace.adminPhotoUrl.useQuery({ sessionToken, role, id, kind }, { enabled: false });
-  const openDocument = async () => {
-    const result = await document.refetch();
-    if (result.data?.url) window.open(result.data.url, "_blank", "noopener,noreferrer");
+  const document = trpc.marketplace.adminPhotoUrl.useQuery({ sessionToken, role, id, kind });
+  const openDocument = () => {
+    if (document.data?.url) window.open(document.data.url, "_blank", "noopener,noreferrer");
     else toast.error("Dokumen belum tersedia");
   };
-  return <button type="button" className="document-link-button" onClick={openDocument} disabled={document.isFetching}>{document.isFetching ? "Membuka..." : label}</button>;
+  if (document.isLoading) return <span className="document-preview-loading">Memuat foto…</span>;
+  if (!document.data?.url) return <span className="document-preview-missing">Foto belum tersedia</span>;
+  return <div className="document-preview-card">
+    <button type="button" className="document-preview-button" onClick={openDocument} aria-label={`Buka ${label}`} title={`Buka ${label}`}>
+      <img className="document-preview-image" src={document.data.url} alt={`${label} ${role}`} />
+    </button>
+    <button type="button" className="document-link-button" onClick={openDocument}>{label}</button>
+  </div>;
 }
 
 function Sidebar({ collapsed, onClose, onLogout }: { collapsed: boolean; onClose: () => void; onLogout: () => void }) {
