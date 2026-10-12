@@ -3,11 +3,11 @@
 :root {
   --ink: #242321;
   --muted: #77736d;
-  --paper: #fbfaf7;
-  --cream: #f3efe7;
+  --paper: #fffaf5;
+  --cream: #fff0df;
   --line: #e9e4dc;
-  --orange: #e7653f;
-  --orange-dark: #c94c2b;
+  --orange: #ff5a00;
+  --orange-dark: #e54800;
   --purple: #6754aa;
   --green: #3f805d;
   --blue: #4b7da6;
@@ -32,7 +32,7 @@ button:active, a:active { transform: scale(.98); }
 .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-family: "Space Grotesk", sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -.06em; white-space: nowrap; }
 .brand > span:last-child > span { color: var(--orange); }
-.brand-mark { width: 30px; height: 30px; display: grid; place-items: center; color: #fff; font-size: 17px; letter-spacing: 0; border-radius: 10px 10px 10px 3px; background: var(--orange); box-shadow: 4px 4px 0 #f7c8b7; }
+.brand-mark { width: 34px; height: 34px; display: grid; place-items: center; color: transparent; font-size: 0; letter-spacing: 0; border-radius: 10px 10px 10px 3px; background-color: #fff; background-image: url("/manus-storage/pasarku-logo_98f818d7.png"); background-position: center; background-repeat: no-repeat; background-size: cover; box-shadow: 3px 3px 0 #ffc166; overflow: hidden; }
 .desktop-nav { display: flex; align-items: center; gap: 30px; color: #716c64; font-size: 12px; font-weight: 600; }
 .desktop-nav a { transition: color .2s ease; }
 .desktop-nav a:hover { color: var(--orange); }
@@ -45,7 +45,7 @@ button:active, a:active { transform: scale(.98); }
 .login-button { border: 0; border-radius: 11px; background: var(--ink); color: #fff; padding: 10px 16px; font-size: 12px; font-weight: 700; }
 .login-button:hover { background: var(--orange); }
 
-.hero-section { background-color: var(--hero-bg-color, #d45b39); color: #fff; position: relative; overflow: hidden; background-size: cover; background-repeat: no-repeat; }
+ .hero-section { background-color: var(--hero-bg-color, #ff5a00); color: #fff; position: relative; overflow: hidden; background-size: cover; background-repeat: no-repeat; }
 .hero-section:before { content: ""; position: absolute; inset: 0; z-index: 0; background: var(--hero-overlay-color, #7a2f2f); opacity: var(--hero-overlay-opacity, .28); pointer-events: none; }
 .hero-section:after { content: ""; position: absolute; inset: 0; z-index: 0; background: radial-gradient(circle at 15% 20%, rgba(255,234,196,.18), transparent 28%), radial-gradient(circle at 88% 0%, rgba(102,74,148,.28), transparent 34%); pointer-events: none; }
 .hero-grid { position: relative; z-index: 1; }
@@ -75,13 +75,13 @@ button:active, a:active { transform: scale(.98); }
 .avatar-stack span:nth-child(3) { background: #6e90ad; }
 .avatar-stack span:last-child { background: #f6d6a6; color: var(--orange-dark); }
 .hero-visual { min-height: 420px; display: grid; place-items: center; position: relative; }
-.hero-card-main { width: min(370px, 78%); padding: 24px 26px 25px; border: 1px solid rgba(255,255,255,.18); border-radius: 26px; background: linear-gradient(145deg, rgba(113,71,109,.95), rgba(66,53,103,.94)); box-shadow: 0 30px 70px rgba(76,35,39,.25); transform: rotate(4deg); position: relative; z-index: 1; }
+.hero-card-main { width: min(370px, 78%); padding: 24px 26px 25px; border: 1px solid rgba(255,255,255,.18); border-radius: 26px; background: linear-gradient(145deg, rgba(213,61,0,.96), rgba(255,143,0,.94)); box-shadow: 0 30px 70px rgba(76,35,39,.25); transform: rotate(4deg); position: relative; z-index: 1; }
 .hero-card-top { display: flex; align-items: center; gap: 6px; color: #f6e7ed; font-size: 10px; font-weight: 700; }
 .hero-card-location { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; color: #eac5ce; font-size: 9px; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #b8e59c; box-shadow: 0 0 0 4px rgba(184,229,156,.15); }
 .market-sticker { width: 85px; height: 85px; display: grid; place-items: center; margin: 42px auto 18px; border: 5px solid rgba(255,255,255,.88); border-radius: 50%; background: #eaba75; font-size: 43px; box-shadow: 0 10px 0 rgba(44,30,59,.15); }
 .hero-card-main h3 { margin: 0; color: #fff; font-family: "Space Grotesk", sans-serif; font-size: 28px; line-height: 1.04; letter-spacing: -.06em; text-align: center; }
-.hero-card-main h3 span { color: #f7c5a3; }
+.hero-card-main h3 span { color: #ffe0a3; }
 .hero-mini-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-top: 23px; margin-top: 25px; border-top: 1px solid rgba(255,255,255,.15); text-align: center; }
 .hero-mini-row strong, .hero-mini-row small { display: block; }
 .hero-mini-row strong { color: #fff2d4; font-size: 13px; }
@@ -165,7 +165,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .how-section { background: #f2eee7; }
 .how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 40px; }
 .how-card { min-height: 265px; padding: 26px; border: 1px solid #e7e0d5; border-radius: 17px; background: rgba(255,255,255,.55); position: relative; }
-.how-card.highlighted { color: #fff; border-color: transparent; background: #6e5ba9; box-shadow: 0 15px 35px rgba(88,67,143,.18); }
+ .how-card.highlighted { color: #fff; border-color: transparent; background: #e54800; box-shadow: 0 15px 35px rgba(88,67,143,.18); }
 .how-card.highlighted p { color: #e3dff6; }
 .step-number { color: #b8b0a5; font-family: "Space Grotesk", sans-serif; font-size: 11px; font-weight: 800; }
 .highlighted .step-number { color: #d3c9f5; }
@@ -176,10 +176,10 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .admin-cta-inner { display: flex; align-items: center; justify-content: space-between; gap: 40px; }
 .admin-cta h2 { margin: 12px 0 13px; font-family: "Space Grotesk", sans-serif; font-size: 45px; line-height: 1; letter-spacing: -.07em; }
 .admin-cta p { max-width: 450px; margin: 0; color: #c9c2da; font-size: 12px; line-height: 1.8; }
-.site-footer { color: #99938b; background: #fffdf9; border-top: 1px solid var(--line); }
+ .site-footer { color: #99938b; background: #fffaf5; border-top: 1px solid var(--line); }
 .footer-inner { min-height: 88px; display: flex; align-items: center; justify-content: space-between; gap: 20px; font-size: 10px; }
 .footer-inner .brand { color: var(--ink); font-size: 15px; }
-.footer-inner .brand-mark { width: 26px; height: 26px; font-size: 14px; }
+.footer-inner .brand-mark { width: 30px; height: 30px; font-size: 0; }
 
 .drawer-scrim, .checkout-backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(42,34,30,.32); backdrop-filter: blur(3px); }
 .drawer-scrim { border: 0; }
