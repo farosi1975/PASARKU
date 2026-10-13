@@ -263,6 +263,8 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .detail-note svg { flex: 0 0 auto; color: var(--green); }
 .related-section { padding-top: 20px; border-top: 1px solid var(--line); }
 .mini-products { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 25px; }
+.mini-thumb-image { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 10px; object-fit: cover; background: #f5d9ca; }
+.related-empty { margin: 0; color: var(--muted); font-size: 11px; }
 .mini-product { display: flex; align-items: center; gap: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 .mini-product:hover { border-color: #edb19e; }
 .mini-product > span:nth-child(2) { min-width: 0; flex: 1; }

@@ -358,8 +358,8 @@ export async function getAdminUserDirectory() {
     buyers: buyers.map((buyer) => ({ ...buyer, orderCount: orderCounts.get(buyer.whatsapp)?.count ?? 0, lastOrderCode: orderCounts.get(buyer.whatsapp)?.lastOrderCode ?? null })),
     sellers: sellers.map((seller) => ({ ...seller, productCount: productCounts.get(seller.id) ?? 0 })),
     couriers,
-    pendingSellers: sellers.filter((seller) => seller.verificationStatus === "pending"),
-    pendingCouriers: couriers.filter((courier) => courier.verificationStatus === "pending"),
+    pendingSellers: sellers.filter((seller) => seller.verificationStatus === "pending" || seller.verificationStatus === "unverified"),
+    pendingCouriers: couriers.filter((courier) => courier.verificationStatus === "pending" || courier.verificationStatus === "unverified"),
   };
 }
 
