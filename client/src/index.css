@@ -898,6 +898,10 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .admin-pending-grid > div { display: grid; gap: 10px; min-width: 0; }
 .admin-pending-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid #efe6de; border-radius: 12px; background: #fff; }
 .admin-pending-row > div { display: grid; gap: 3px; min-width: 0; }
+.admin-pending-documents { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 5px; }
+.admin-pending-documents .document-preview-card { margin: 0 4px 0 0; }
+.admin-pending-documents .document-preview-button { width: 42px; height: 42px; }
+.admin-pending-documents .document-link-button { max-width: 60px; overflow: hidden; border: 0; padding: 0; color: var(--orange); background: transparent; font-size: 8px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .admin-pending-row b { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .admin-pending-row small { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .admin-pending-row > span { display: flex; flex: 0 0 auto; gap: 5px; }
