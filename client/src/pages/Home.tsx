@@ -28,6 +28,8 @@ function Header({ onCart, logoUrl, brandName }: { onCart: () => void; logoUrl?: 
   const [, navigate] = useLocation();
   const [userName, setUserName] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
+  useEffect(() => setLogoFailed(false), [logoUrl]);
   useEffect(() => {
     const loadUser = () => { try {
       const session = JSON.parse(window.localStorage.getItem(USER_SESSION_KEY) || "null") as { name?: string } | null;
@@ -51,7 +53,7 @@ function Header({ onCart, logoUrl, brandName }: { onCart: () => void; logoUrl?: 
     <header className="site-header">
       <div className="container-wide header-inner">
         <Link href="/" className="brand" aria-label={`${brandName} beranda`}>
-          {logoUrl ? <img className="brand-logo" src={logoUrl} alt="Logo PASARKU" /> : <span className="brand-mark">P</span>}
+          {logoUrl && !logoFailed ? <img className="brand-logo" src={logoUrl} alt="Logo PASARKU" onError={() => setLogoFailed(true)} /> : <span className="brand-mark">P</span>}
           <span>{brandName}</span>
         </Link>
         <nav className="desktop-nav" aria-label="Navigasi utama">

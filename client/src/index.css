@@ -32,7 +32,7 @@ button:active, a:active { transform: scale(.98); }
 .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-family: "Space Grotesk", sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -.06em; white-space: nowrap; }
 .brand > span:last-child > span { color: var(--orange); }
-.brand-mark { width: 34px; height: 34px; display: grid; place-items: center; color: transparent; font-size: 0; letter-spacing: 0; border-radius: 10px 10px 10px 3px; background-color: #fff; background-image: url("/manus-storage/pasarku-logo_98f818d7.png"); background-position: center; background-repeat: no-repeat; background-size: cover; box-shadow: 3px 3px 0 #ffc166; overflow: hidden; }
+.brand-mark { width: 34px; height: 34px; display: grid; place-items: center; color: transparent; font-size: 0; letter-spacing: 0; border-radius: 10px 10px 10px 3px; background-color: #fff; background-image: url("/pasarku-logo.png"); background-position: center; background-repeat: no-repeat; background-size: cover; box-shadow: 3px 3px 0 #ffc166; overflow: hidden; }
 .desktop-nav { display: flex; align-items: center; gap: 30px; color: #716c64; font-size: 12px; font-weight: 600; }
 .desktop-nav a { transition: color .2s ease; }
 .desktop-nav a:hover { color: var(--orange); }
