@@ -946,6 +946,11 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .seller-photo-picker { display: grid; gap: 7px; padding: 12px; border: 1px dashed #e9cfc1; border-radius: 10px; color: #7f695f; background: #fffaf6; cursor: pointer; }
 .seller-photo-picker span { display: flex; align-items: center; gap: 7px; color: #5b443b; font-size: 10px; font-weight: 800; }
 .seller-photo-picker input { width: 100%; color: #8e776d; font-size: 10px; }
+.photo-source-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.photo-source-button { display: inline-flex; align-items: center; justify-content: center; min-height: 32px; padding: 7px 10px; border: 1px solid #e9cfc1; border-radius: 8px; color: #a64b37; background: #fff; font-size: 10px; font-weight: 800; cursor: pointer; }
+.photo-source-button:hover { background: #fff0eb; }
+.photo-source-button input { display: none; }
+.photo-camera-input { display: none !important; }
 .seller-photo-picker small { color: #a38d83; font-size: 9px; }
 .seller-photo-preview { width: 100%; height: 150px; object-fit: cover; border-radius: 10px; border: 1px solid #f0ded5; }
 .seller-product-thumb { width: 42px; height: 42px; flex: 0 0 42px; object-fit: cover; border-radius: 9px; border: 1px solid #f0ded5; }
