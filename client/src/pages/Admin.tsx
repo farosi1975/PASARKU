@@ -38,19 +38,29 @@ function storeAdminSession(session: AdminSession | null) {
 }
 
 function AdminDocumentLink({ sessionToken, role, id, kind, label }: { sessionToken: string; role: "seller" | "courier"; id: number; kind: "identity" | "selfie"; label: string }) {
+  const [isOpen, setIsOpen] = useState(false);
   const document = trpc.marketplace.adminPhotoUrl.useQuery({ sessionToken, role, id, kind });
   const openDocument = () => {
-    if (document.data?.url) window.open(document.data.url, "_blank", "noopener,noreferrer");
+    if (document.data?.url) setIsOpen(true);
     else toast.error("Dokumen belum tersedia");
   };
   if (document.isLoading) return <span className="document-preview-loading">Memuat foto…</span>;
   if (!document.data?.url) return <span className="document-preview-missing">Foto belum tersedia</span>;
-  return <div className="document-preview-card">
-    <button type="button" className="document-preview-button" onClick={openDocument} aria-label={`Buka ${label}`} title={`Buka ${label}`}>
-      <img className="document-preview-image" src={document.data.url} alt={`${label} ${role}`} />
-    </button>
-    <button type="button" className="document-link-button" onClick={openDocument}>{label}</button>
-  </div>;
+  return <>
+    <div className="document-preview-card">
+      <button type="button" className="document-preview-button" onClick={openDocument} aria-label={`Lihat ${label}`} title={`Lihat ${label}`}>
+        <img className="document-preview-image" src={document.data.url} alt={`${label} ${role}`} />
+      </button>
+      <button type="button" className="document-link-button" onClick={openDocument}>{label}</button>
+    </div>
+    {isOpen && <div className="document-lightbox" role="dialog" aria-modal="true" aria-label={`${label} ${role}`} onClick={() => setIsOpen(false)}>
+      <div className="document-lightbox-panel" onClick={(event) => event.stopPropagation()}>
+        <div className="document-lightbox-heading"><strong>{label} {role === "seller" ? "penjual" : "kurir"}</strong><button type="button" className="document-lightbox-close" onClick={() => setIsOpen(false)} aria-label="Tutup preview">×</button></div>
+        <img className="document-lightbox-image" src={document.data.url} alt={`${label} ${role}`} />
+        <button type="button" className="outline-button document-lightbox-close-action" onClick={() => setIsOpen(false)}>Tutup</button>
+      </div>
+    </div>}
+  </>;
 }
 
 function Sidebar({ collapsed, onClose, onLogout }: { collapsed: boolean; onClose: () => void; onLogout: () => void }) {

@@ -1320,3 +1320,20 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .document-preview-image { display: block; width: 100%; height: 100%; object-fit: cover; }
 .document-preview-button:hover { border-color: var(--orange); box-shadow: 0 3px 10px rgba(224, 99, 55, .2); }
 .document-preview-loading, .document-preview-missing { display: inline-block; margin: 0 5px 5px 0; color: #a58e83; font-size: 9px; }
+
+.document-lightbox { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(34, 24, 20, .76); }
+.document-lightbox-panel { display: grid; gap: 12px; width: min(100%, 560px); max-height: min(92vh, 760px); padding: 14px; overflow: auto; border-radius: 16px; background: #fffdf9; box-shadow: 0 24px 80px rgba(0,0,0,.3); }
+.document-lightbox-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #4b332b; }
+.document-lightbox-close { width: 32px; height: 32px; border: 0; border-radius: 50%; color: #70483b; background: #f8ece5; font-size: 22px; line-height: 1; cursor: pointer; }
+.document-lightbox-image { display: block; width: 100%; max-height: 68vh; object-fit: contain; border-radius: 10px; background: #f5eee9; }
+.document-lightbox-close-action { justify-self: end; }
+.courier-activity-card { display: flex; align-items: center; gap: 10px; margin-top: 28px; padding: 12px 14px; border: 1px solid #eadfd8; border-radius: 14px; background: #fffaf6; }
+.courier-activity-card > div:nth-child(2) { display: grid; gap: 3px; min-width: 0; }
+.courier-activity-card strong { color: #4b332b; font-size: 12px; }
+.courier-activity-card small { color: var(--muted); font-size: 10px; }
+.courier-activity-icon { display: grid; flex: 0 0 auto; width: 34px; height: 34px; place-items: center; border-radius: 10px; color: #a36e5a; background: #f1e5de; }
+.courier-activity-icon.active { color: #277653; background: #dcf3e6; }
+.courier-activity-status { margin-left: auto; color: #a36e5a; font-size: 10px; font-weight: 800; }
+.courier-activity-status.active { color: #277653; }
+.courier-live-location { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin: 10px 0 0; color: #277653; font-size: 10px; font-weight: 700; }
+.courier-live-location small { color: var(--muted); font-weight: 500; }

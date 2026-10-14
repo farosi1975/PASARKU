@@ -591,6 +591,16 @@ export const appRouter = router({
       return { success: true as const, courier: courier[0], notificationSent: notification.sent };
     }),
     courierOrders: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => { const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1); return courier[0]?.verificationStatus === "verified" && !courier[0].isBanned ? listCourierOrders(courier[0].id) : []; }),
+    updateCourierLocation: publicProcedure.input(z.object({ whatsapp: phone, latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180) })).mutation(async ({ input }) => {
+      const db = await dbRequired();
+      const whatsapp = normalizePhone(input.whatsapp);
+      const courier = await db.select({ id: courierProfiles.id, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned }).from(courierProfiles).where(eq(courierProfiles.whatsapp, whatsapp)).limit(1);
+      if (!courier[0] || courier[0].verificationStatus !== "verified" || courier[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Kurir belum terverifikasi atau sedang diblokir." });
+      const currentLocation = `${input.latitude.toFixed(6)},${input.longitude.toFixed(6)}`;
+      const updatedAt = new Date();
+      await db.update(courierProfiles).set({ currentLocation, updatedAt }).where(eq(courierProfiles.id, courier[0].id));
+      return { success: true as const, currentLocation, updatedAt: updatedAt.toISOString() };
+    }),
     acceptCourierTask: publicProcedure.input(z.object({ whatsapp: phone, orderCode: z.string().min(3) })).mutation(async ({ input }) => {
       const db = await dbRequired();
       const courier = await db.select().from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1);

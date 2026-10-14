@@ -50,6 +50,7 @@ export const courierProfiles = mysqlTable("courier_profiles", {
   vehicle: varchar("vehicle", { length: 40 }).notNull(),
   village: varchar("village", { length: 80 }).default("Sawahan").notNull(),
   address: text("address"),
+  currentLocation: text("currentLocation"),
   verificationStatus: mysqlEnum("verificationStatus", ["pending", "verified", "rejected", "unverified"]).default("pending").notNull(),
   documentsReviewedAt: timestamp("documentsReviewedAt"),
   isBanned: int("isBanned").default(0).notNull(),

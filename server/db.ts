@@ -41,6 +41,11 @@ const ensureMySqlRuntimeColumns = async () => {
       if (code !== "ER_DUP_FIELDNAME") console.warn(`[Database] Kolom ${column} belum dapat disiapkan:`, error instanceof Error ? error.message : error);
     }
   }
+  try { await _mysqlPool.query(`ALTER TABLE courier_profiles ADD COLUMN currentLocation text NULL`); }
+  catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom lokasi kurir belum dapat disiapkan:", error instanceof Error ? error.message : error);
+  }
 };
 
 export async function getDb(): Promise<CompatibleDatabase | null> {
@@ -321,6 +326,8 @@ export async function listCourierOrders(courierId: number) {
       pickupShopName: seller?.shopName ?? "Penjual PASARKU",
       pickupVillage: seller?.village ?? "Sawahan",
       pickupLocation: seller?.currentLocation ?? order.pickupLocation,
+      courierCurrentLocation: (await db.select({ currentLocation: courierProfiles.currentLocation }).from(courierProfiles).where(eq(courierProfiles.id, courierId)).limit(1))[0]?.currentLocation ?? null,
+      courierLocationUpdatedAt: (await db.select({ updatedAt: courierProfiles.updatedAt }).from(courierProfiles).where(eq(courierProfiles.id, courierId)).limit(1))[0]?.updatedAt ?? null,
       items: await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
     };
   }));

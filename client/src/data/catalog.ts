@@ -45,6 +45,8 @@ export type MockOrder = {
   status: OrderStatus;
   time: string;
   courier?: string;
+  courierCurrentLocation?: string | null;
+  courierLocationUpdatedAt?: string | Date | null;
 };
 
 export const PRODUCT_CATEGORIES = ["Kuliner", "Sembako", "Hasil tani", "Jasa", "Gerabah", "Elektronik"] as const;
