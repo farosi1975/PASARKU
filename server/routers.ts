@@ -512,13 +512,17 @@ export const appRouter = router({
         if (!row[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Profil penjual tidak ditemukan." });
         const key = input.kind === "identity" ? row[0].identityPhotoKey : row[0].selfiePhotoKey;
         const legacyUrl = input.kind === "identity" ? row[0].identityPhotoUrl : row[0].selfiePhotoUrl;
-        return { url: key ? await storageGetSignedUrl(key) : legacyUrl };
+        if (!key || legacyUrl?.startsWith("data:")) return { url: legacyUrl };
+        try { return { url: await storageGetSignedUrl(key) }; }
+        catch { return { url: legacyUrl }; }
       }
       const row = await db.select().from(courierProfiles).where(eq(courierProfiles.id, input.id)).limit(1);
       if (!row[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Profil kurir tidak ditemukan." });
       const key = input.kind === "identity" ? row[0].identityPhotoKey : row[0].selfiePhotoKey;
       const legacyUrl = input.kind === "identity" ? row[0].identityPhotoUrl : row[0].selfiePhotoUrl;
-      return { url: key ? await storageGetSignedUrl(key) : legacyUrl };
+      if (!key || legacyUrl?.startsWith("data:")) return { url: legacyUrl };
+      try { return { url: await storageGetSignedUrl(key) }; }
+      catch { return { url: legacyUrl }; }
     }),
     resetNonAdminData: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return resetMarketplaceData(); }),
     deleteUser: publicProcedure.input(z.object({ sessionToken: adminSessionToken, role: z.enum(["buyer", "seller", "courier"]), id: z.number().int().positive() })).mutation(async ({ input }) => {
