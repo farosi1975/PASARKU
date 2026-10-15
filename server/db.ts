@@ -335,7 +335,7 @@ export async function listCourierOrders(courierId: number) {
 
 export async function listCouriers() {
   const db = await getDb(); if (!db) return [];
-  return db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned }).from(courierProfiles).where(and(eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).orderBy(courierProfiles.name);
+  return db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle, currentLocation: courierProfiles.currentLocation, updatedAt: courierProfiles.updatedAt, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned }).from(courierProfiles).where(and(eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).orderBy(courierProfiles.name);
 }
 
 export async function listSellerCouriers() {
