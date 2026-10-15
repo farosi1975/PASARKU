@@ -139,6 +139,8 @@ const requireAdminSession = async (token: string) => {
   if (!profile) { adminSessions.delete(token); throw new TRPCError({ code: "FORBIDDEN", message: "Admin tidak terverifikasi." }); }
   return profile;
 };
+const PASARKU_WEB_URL = process.env.PUBLIC_APP_URL?.trim() || "https://pasarku.onrender.com";
+
 const notifyVerificationResult = async (target: string, role: "seller" | "courier", status: "verified" | "rejected", displayName: string) => {
   const roleLabel = role === "seller" ? "penjual" : "kurir";
   const statusText = status === "verified" ? "disetujui" : "ditolak";
@@ -171,7 +173,9 @@ const notifySellerOrderCancelled = async (db: any, orderCode: string) => {
   }
 };
 const notifyCourierAssignment = async (target: string, orderCode: string, total: number, source: "otomatis" | "Admin") => {
-  const message = `PASARKU: Pesanan ${orderCode} telah ditugaskan ${source === "otomatis" ? "secara otomatis berdasarkan pilihan toko" : "oleh Admin"} kepada Anda. Total COD: Rp${total.toLocaleString("id-ID")}. Buka portal kurir untuk menerima dan mengantar tugas.`;
+  const message = `PASARKU: Pesanan ${orderCode} telah ditugaskan ${source === "otomatis" ? "secara otomatis berdasarkan pilihan toko" : "oleh Admin"} kepada Anda. Total COD: Rp${total.toLocaleString("id-ID")}. Buka portal kurir untuk menerima dan mengantar tugas.
+
+Buka PWA PASARKU: ${PASARKU_WEB_URL}`;
   try {
     await sendFonnteMessage(target, message);
     return { sent: true as const };
@@ -181,7 +185,9 @@ const notifyCourierAssignment = async (target: string, orderCode: string, total:
   }
 };
 const notifyAdminNewOrder = async (target: string, orderCode: string, customerName: string, village: string, total: number) => {
-  const message = `PASARKU: Pesanan baru ${orderCode} dari ${customerName}, Desa ${village}. Total COD: Rp${total.toLocaleString("id-ID")}. Silakan buka panel Admin untuk memproses pesanan.`;
+  const message = `PASARKU: Pesanan baru ${orderCode} dari ${customerName}, Desa ${village}. Total COD: Rp${total.toLocaleString("id-ID")}. Silakan buka panel Admin untuk memproses pesanan.
+
+Buka PWA PASARKU: ${PASARKU_WEB_URL}`;
   try {
     await sendFonnteMessage(target, message);
     return { sent: true as const };
