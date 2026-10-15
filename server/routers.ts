@@ -172,8 +172,23 @@ const notifySellerOrderCancelled = async (db: any, orderCode: string) => {
     console.error("[FONNTE] Pengambilan penjual untuk notifikasi pembatalan gagal:", error instanceof Error ? error.message : error);
   }
 };
-const notifyCourierAssignment = async (target: string, orderCode: string, total: number, source: "otomatis" | "Admin") => {
-  const message = `PASARKU: Pesanan ${orderCode} telah ditugaskan ${source === "otomatis" ? "secara otomatis berdasarkan pilihan toko" : "oleh Admin"} kepada Anda. Total COD: Rp${total.toLocaleString("id-ID")}. Buka portal kurir untuk menerima dan mengantar tugas.
+type InvoiceNotification = {
+  items: Array<{ productName: string; price: number; quantity: number }>;
+  subtotal: number;
+  delivery: number;
+  handlingFee: number;
+  total: number;
+};
+
+const formatInvoiceNotification = (invoice: InvoiceNotification) => {
+  const lines = invoice.items.map((item) => `• ${item.productName} (${item.quantity} x Rp${item.price.toLocaleString("id-ID")}) = Rp${(item.price * item.quantity).toLocaleString("id-ID")}`);
+  return ["Rincian invoice:", ...lines, `Subtotal: Rp${invoice.subtotal.toLocaleString("id-ID")}`, `Ongkir: Rp${invoice.delivery.toLocaleString("id-ID")}`, `Biaya penanganan: Rp${invoice.handlingFee.toLocaleString("id-ID")}`, `Total COD: Rp${invoice.total.toLocaleString("id-ID")}`].join("\n");
+};
+
+const notifyCourierAssignment = async (target: string, orderCode: string, total: number, source: "otomatis" | "Admin", invoice: InvoiceNotification) => {
+  const message = `PASARKU: Pesanan ${orderCode} telah ditugaskan ${source === "otomatis" ? "secara otomatis berdasarkan pilihan toko" : "oleh Admin"} kepada Anda. Buka portal kurir untuk menerima dan mengantar tugas.
+
+${formatInvoiceNotification(invoice)}
 
 Buka PWA PASARKU: ${PASARKU_WEB_URL}`;
   try {
@@ -184,8 +199,10 @@ Buka PWA PASARKU: ${PASARKU_WEB_URL}`;
     return { sent: false as const };
   }
 };
-const notifyAdminNewOrder = async (target: string, orderCode: string, customerName: string, village: string, total: number) => {
-  const message = `PASARKU: Pesanan baru ${orderCode} dari ${customerName}, Desa ${village}. Total COD: Rp${total.toLocaleString("id-ID")}. Silakan buka panel Admin untuk memproses pesanan.
+const notifyAdminNewOrder = async (target: string, orderCode: string, customerName: string, village: string, total: number, invoice: InvoiceNotification) => {
+  const message = `PASARKU: Pesanan baru ${orderCode} dari ${customerName}, Desa ${village}. Silakan buka panel Admin untuk memproses pesanan.
+
+${formatInvoiceNotification(invoice)}
 
 Buka PWA PASARKU: ${PASARKU_WEB_URL}`;
   try {
@@ -494,9 +511,10 @@ export const appRouter = router({
           }
         }
       }
+      const invoice = { items: input.items, subtotal: input.subtotal, delivery: calculatedDelivery, handlingFee: calculatedHandlingFee, total: calculatedTotal };
       const adminSettings = await getShippingSettings();
-      void notifyAdminNewOrder(adminSettings.adminWhatsapp, orderCode, input.customerName, input.village, calculatedTotal);
-      if (assignedCourier) void notifyCourierAssignment(assignedCourier.whatsapp, orderCode, calculatedTotal, "otomatis");
+      void notifyAdminNewOrder(adminSettings.adminWhatsapp, orderCode, input.customerName, input.village, calculatedTotal, invoice);
+      if (assignedCourier) void notifyCourierAssignment(assignedCourier.whatsapp, orderCode, calculatedTotal, "otomatis", invoice);
       return getOrderWithItems(orderCode);
     }),
     orders: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listOrders(); }),
@@ -590,10 +608,12 @@ export const appRouter = router({
       await requireAdminSession(input.sessionToken); const db = await dbRequired();
       const courier = await db.select().from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1);
       if (!courier[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Kurir belum terverifikasi atau sedang diblokir." });
-      const order = await db.select({ total: orders.total }).from(orders).where(eq(orders.orderCode, input.orderCode)).limit(1);
+      const order = await db.select({ id: orders.id, subtotal: orders.subtotal, delivery: orders.delivery, handlingFee: orders.handlingFee, total: orders.total }).from(orders).where(eq(orders.orderCode, input.orderCode)).limit(1);
       if (!order[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Pesanan tidak ditemukan." });
+      const invoiceItems = await db.select({ productName: orderItems.productName, price: orderItems.price, quantity: orderItems.quantity }).from(orderItems).where(eq(orderItems.orderId, order[0].id));
+      const invoice = { items: invoiceItems, subtotal: order[0].subtotal, delivery: order[0].delivery, handlingFee: order[0].handlingFee, total: order[0].total };
       await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null }).where(eq(orders.orderCode, input.orderCode));
-      const notification = await notifyCourierAssignment(courier[0].whatsapp, input.orderCode, order[0].total, "Admin");
+      const notification = await notifyCourierAssignment(courier[0].whatsapp, input.orderCode, order[0].total, "Admin", invoice);
       return { success: true as const, courier: courier[0], notificationSent: notification.sent };
     }),
     courierOrders: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => { const db = await dbRequired(); const courier = await db.select().from(courierProfiles).where(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1); return courier[0]?.verificationStatus === "verified" && !courier[0].isBanned ? listCourierOrders(courier[0].id) : []; }),
