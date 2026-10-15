@@ -135,13 +135,18 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
   const buyerProfile = trpc.marketplace.buyerProfile.useQuery({ whatsapp: buyerPhone || "0000000000" }, { enabled: buyerPhone.length >= 10 });
   const shippingSettings = trpc.marketplace.shippingSettings.useQuery();
-  const storeLocation = items.find((item) => item.storeLocation)?.storeLocation || null;
+  // Backend hanya memakai lokasi pickup bila seluruh item berasal dari satu titik toko.
+  // Gunakan aturan yang sama agar ongkir preview identik dengan ongkir pada nota.
+  const storeLocations = items.map((item) => item.storeLocation?.trim()).filter((location): location is string => Boolean(location));
+  const storeLocation = storeLocations.length === items.length && new Set(storeLocations).size === 1 ? storeLocations[0] : null;
   const storeOrigin = parseCoordinates(storeLocation);
   useEffect(() => {
     let cancelled = false;
     const origin = storeOrigin;
     const destination = parseCoordinates(currentLocation);
-    if (!origin || !destination) { setRouteDistanceKm(null); return; }
+    // Jangan menampilkan ongkir berdasarkan hasil rute lama saat lokasi berubah.
+    setRouteDistanceKm(null);
+    if (!origin || !destination) return;
     getGoogleDrivingDistanceKm(origin, destination).then((distance) => { if (!cancelled) setRouteDistanceKm(distance); }).catch(() => { if (!cancelled) setRouteDistanceKm(null); });
     return () => { cancelled = true; };
   }, [currentLocation, storeLocation]);
