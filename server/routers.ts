@@ -178,6 +178,9 @@ type InvoiceNotification = {
   delivery: number;
   handlingFee: number;
   total: number;
+  deliveryAddress?: string;
+  buyerNote?: string | null;
+  buyerLocation?: string | null;
 };
 
 const formatInvoiceNotification = (invoice: InvoiceNotification) => {
@@ -185,12 +188,14 @@ const formatInvoiceNotification = (invoice: InvoiceNotification) => {
   return ["Rincian invoice:", ...lines, `Subtotal: Rp${invoice.subtotal.toLocaleString("id-ID")}`, `Ongkir: Rp${invoice.delivery.toLocaleString("id-ID")}`, `Biaya penanganan: Rp${invoice.handlingFee.toLocaleString("id-ID")}`, `Total COD: Rp${invoice.total.toLocaleString("id-ID")}`].join("\n");
 };
 
+const formatCourierDeliveryDetails = (invoice: InvoiceNotification) => {
+  const destination = invoice.buyerLocation || invoice.deliveryAddress;
+  const navigationUrl = destination ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}` : null;
+  return ["Detail pengantaran:", `Alamat: ${invoice.deliveryAddress || "Belum diisi"}`, invoice.buyerNote ? `Pesan pembeli: ${invoice.buyerNote}` : "Pesan pembeli: Tidak ada", navigationUrl ? `Navigasi: ${navigationUrl}` : "Navigasi: Lokasi belum tersedia"].join("\n");
+};
+
 const notifyCourierAssignment = async (target: string, orderCode: string, total: number, source: "otomatis" | "Admin", invoice: InvoiceNotification) => {
-  const message = `PASARKU: Pesanan ${orderCode} telah ditugaskan ${source === "otomatis" ? "secara otomatis berdasarkan pilihan toko" : "oleh Admin"} kepada Anda. Buka portal kurir untuk menerima dan mengantar tugas.
-
-${formatInvoiceNotification(invoice)}
-
-Buka PWA PASARKU: ${PASARKU_WEB_URL}`;
+  const message = `PASARKU: Pesanan ${orderCode} telah ditugaskan ${source === "otomatis" ? "secara otomatis berdasarkan pilihan toko" : "oleh Admin"} kepada Anda. Buka portal kurir untuk menerima dan mengantar tugas.\n\n${formatInvoiceNotification(invoice)}\n\n${formatCourierDeliveryDetails(invoice)}\n\nBuka PWA PASARKU: ${PASARKU_WEB_URL}`;
   try {
     await sendFonnteMessage(target, message);
     return { sent: true as const };
@@ -511,7 +516,7 @@ export const appRouter = router({
           }
         }
       }
-      const invoice = { items: input.items, subtotal: input.subtotal, delivery: calculatedDelivery, handlingFee: calculatedHandlingFee, total: calculatedTotal };
+      const invoice = { items: input.items, subtotal: input.subtotal, delivery: calculatedDelivery, handlingFee: calculatedHandlingFee, total: calculatedTotal, deliveryAddress: `${input.address}, Desa ${input.village}`, buyerNote: input.note || null, buyerLocation: input.currentLocation || null };
       const adminSettings = await getShippingSettings();
       void notifyAdminNewOrder(adminSettings.adminWhatsapp, orderCode, input.customerName, input.village, calculatedTotal, invoice);
       if (assignedCourier) void notifyCourierAssignment(assignedCourier.whatsapp, orderCode, calculatedTotal, "otomatis", invoice);
@@ -608,10 +613,10 @@ export const appRouter = router({
       await requireAdminSession(input.sessionToken); const db = await dbRequired();
       const courier = await db.select().from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1);
       if (!courier[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Kurir belum terverifikasi atau sedang diblokir." });
-      const order = await db.select({ id: orders.id, subtotal: orders.subtotal, delivery: orders.delivery, handlingFee: orders.handlingFee, total: orders.total }).from(orders).where(eq(orders.orderCode, input.orderCode)).limit(1);
+      const order = await db.select({ id: orders.id, subtotal: orders.subtotal, delivery: orders.delivery, handlingFee: orders.handlingFee, total: orders.total, address: orders.address, village: orders.village, note: orders.note, currentLocation: orders.currentLocation }).from(orders).where(eq(orders.orderCode, input.orderCode)).limit(1);
       if (!order[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Pesanan tidak ditemukan." });
       const invoiceItems = await db.select({ productName: orderItems.productName, price: orderItems.price, quantity: orderItems.quantity }).from(orderItems).where(eq(orderItems.orderId, order[0].id));
-      const invoice = { items: invoiceItems, subtotal: order[0].subtotal, delivery: order[0].delivery, handlingFee: order[0].handlingFee, total: order[0].total };
+      const invoice = { items: invoiceItems, subtotal: order[0].subtotal, delivery: order[0].delivery, handlingFee: order[0].handlingFee, total: order[0].total, deliveryAddress: `${order[0].address}, Desa ${order[0].village}`, buyerNote: order[0].note, buyerLocation: order[0].currentLocation };
       await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null }).where(eq(orders.orderCode, input.orderCode));
       const notification = await notifyCourierAssignment(courier[0].whatsapp, input.orderCode, order[0].total, "Admin", invoice);
       return { success: true as const, courier: courier[0], notificationSent: notification.sent };
