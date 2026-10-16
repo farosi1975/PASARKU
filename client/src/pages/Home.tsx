@@ -172,10 +172,11 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   }, [buyerProfile.data, open]);
   if (!open) return null;
   const hasFreeShipping = items.length > 0 && items.every((item) => item.sellerFreeShipping === true);
-  const delivery = calculateShippingCost(shipping, currentLocation, hasFreeShipping, routeDistanceKm);
   const buyerCoordinates = parseCoordinates(currentLocation);
   const configuredOrigin = parseCoordinates(`${shipping.originLatitude},${shipping.originLongitude}`);
   const effectiveOrigin = storeOrigin || configuredOrigin;
+  const effectiveShipping = storeOrigin ? { ...shipping, originLatitude: String(storeOrigin.latitude), originLongitude: String(storeOrigin.longitude) } : shipping;
+  const delivery = calculateShippingCost(effectiveShipping, currentLocation, hasFreeShipping, routeDistanceKm);
   const distanceKm = routeDistanceKm || (effectiveOrigin && buyerCoordinates ? distanceBetweenCoordinates(effectiveOrigin, buyerCoordinates) : 1);
   const handlingFee = Math.round(subtotal * (shipping.handlingFeePercent || 0) / 100);
   const total = subtotal + handlingFee + delivery;
