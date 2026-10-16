@@ -135,6 +135,7 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
   const buyerProfile = trpc.marketplace.buyerProfile.useQuery({ whatsapp: buyerPhone || "0000000000" }, { enabled: buyerPhone.length >= 10 });
   const shippingSettings = trpc.marketplace.shippingSettings.useQuery();
+  const shipping = shippingSettings.data || DEFAULT_SHIPPING_SETTINGS;
   // Backend hanya memakai lokasi pickup bila seluruh item berasal dari satu titik toko.
   // Gunakan aturan yang sama agar ongkir preview identik dengan ongkir pada nota.
   const storeLocations = items.map((item) => item.storeLocation?.trim()).filter((location): location is string => Boolean(location));
@@ -171,10 +172,11 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   }, [buyerProfile.data, open]);
   if (!open) return null;
   const hasFreeShipping = items.length > 0 && items.every((item) => item.sellerFreeShipping === true);
-  const shipping = shippingSettings.data || DEFAULT_SHIPPING_SETTINGS;
   const delivery = calculateShippingCost(shipping, currentLocation, hasFreeShipping, routeDistanceKm);
   const buyerCoordinates = parseCoordinates(currentLocation);
-  const distanceKm = routeDistanceKm || (storeOrigin && buyerCoordinates ? distanceBetweenCoordinates(storeOrigin, buyerCoordinates) : 1);
+  const configuredOrigin = parseCoordinates(`${shipping.originLatitude},${shipping.originLongitude}`);
+  const effectiveOrigin = storeOrigin || configuredOrigin;
+  const distanceKm = routeDistanceKm || (effectiveOrigin && buyerCoordinates ? distanceBetweenCoordinates(effectiveOrigin, buyerCoordinates) : 1);
   const handlingFee = Math.round(subtotal * (shipping.handlingFeePercent || 0) / 100);
   const total = subtotal + handlingFee + delivery;
   const unavailableItems = items.filter((item) => item.stock !== undefined && (item.stock === 0 || item.quantity > item.stock));
