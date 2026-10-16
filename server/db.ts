@@ -333,9 +333,23 @@ export async function listCourierOrders(courierId: number) {
   }));
 }
 
+type AdminCourierTask = { orderCode: string; action: "pick up" | "mengantar"; status: string; customerName: string; address: string; village: string; pickupLocation: string | null };
+
 export async function listCouriers() {
   const db = await getDb(); if (!db) return [];
-  return db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle, currentLocation: courierProfiles.currentLocation, updatedAt: courierProfiles.updatedAt, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned }).from(courierProfiles).where(and(eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).orderBy(courierProfiles.name);
+  const couriers = await db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle, currentLocation: courierProfiles.currentLocation, updatedAt: courierProfiles.updatedAt, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned }).from(courierProfiles).where(and(eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).orderBy(courierProfiles.name);
+  if (!couriers.length) return couriers.map((courier) => ({ ...courier, activeTasks: [] as AdminCourierTask[] }));
+  const activeOrders = await db.select({ id: orders.id, orderCode: orders.orderCode, courierId: orders.courierId, status: orders.status, customerName: orders.customerName, address: orders.address, village: orders.village, pickupLocation: orders.pickupLocation })
+    .from(orders)
+    .where(and(inArray(orders.courierId, couriers.map((courier) => courier.id)), sql`${orders.status} NOT IN ('Selesai', 'Dibatalkan')`));
+  const tasksByCourier = new Map<number, AdminCourierTask[]>();
+  for (const order of activeOrders) {
+    if (!order.courierId) continue;
+    const tasks = tasksByCourier.get(order.courierId) ?? [];
+    tasks.push({ orderCode: order.orderCode, action: order.status === "Diantar" ? "mengantar" : "pick up", status: order.status, customerName: order.customerName, address: order.address, village: order.village, pickupLocation: order.pickupLocation });
+    tasksByCourier.set(order.courierId, tasks);
+  }
+  return couriers.map((courier) => ({ ...courier, activeTasks: tasksByCourier.get(courier.id) ?? [] }));
 }
 
 export async function listSellerCouriers() {
