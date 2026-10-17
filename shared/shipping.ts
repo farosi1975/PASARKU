@@ -7,8 +7,8 @@ export type ShippingSettings = {
 };
 
 export const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
-  ratePerKm: 3000,
-  discountPercent: 0,
+  ratePerKm: 2000, // Menyesuaikan tarif dasar Anda
+  discountPercent: 20, // Menyesuaikan diskon Anda
   handlingFeePercent: 0,
   originLatitude: "-7.602345",
   originLongitude: "111.904321",
@@ -43,7 +43,15 @@ export function distanceBetweenCoordinates(source: { latitude: number; longitude
 
 export function calculateShippingCost(settings: ShippingSettings, currentLocation?: string | null, freeShipping = false, routeDistanceKm?: number | null) {
   if (freeShipping) return 0;
-  const distanceKm = routeDistanceKm && Number.isFinite(routeDistanceKm) && routeDistanceKm > 0 && routeDistanceKm <= 100 ? routeDistanceKm : distanceInKm(currentLocation, settings);
+  
+  // Gunakan routeDistanceKm secara mutlak jika ada dan valid (> 0)
+  let distanceKm = 1;
+  if (routeDistanceKm !== null && routeDistanceKm !== undefined && Number.isFinite(routeDistanceKm) && routeDistanceKm > 0) {
+    distanceKm = routeDistanceKm;
+  } else {
+    distanceKm = distanceInKm(currentLocation, settings);
+  }
+
   const gross = Math.ceil(distanceKm * Math.max(0, settings.ratePerKm));
   const discount = Math.min(100, Math.max(0, settings.discountPercent));
   return Math.max(0, Math.round(gross * (1 - discount / 100)));
