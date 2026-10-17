@@ -179,11 +179,14 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   if (!open) return null;
   const hasFreeShipping = items.length > 0 && items.every((item) => item.sellerFreeShipping === true);
   const delivery = calculateShippingCost(shipping, form.village, hasFreeShipping, routeDistanceKm);
-
   const buyerCoordinates = parseCoordinates(currentLocation);
   const configuredOrigin = parseCoordinates(`${shipping.originLatitude},${shipping.originLongitude}`);
   const effectiveOrigin = storeOrigin || configuredOrigin;
-  const distanceKm = routeDistanceKm || (effectiveOrigin && buyerCoordinates ? distanceBetweenCoordinates(effectiveOrigin, buyerCoordinates) : 1);
+  // Ambil routeDistanceKm jika valid, jika tidak gunakan jarak fallback yang aman
+const distanceKm = routeDistanceKm !== null && routeDistanceKm !== undefined && Number.isFinite(routeDistanceKm) && routeDistanceKm > 0 
+  ? routeDistanceKm 
+  : (effectiveOrigin && buyerCoordinates ? distanceBetweenCoordinates(effectiveOrigin, buyerCoordinates) : 1);
+
   const handlingFee = Math.round(subtotal * (shipping.handlingFeePercent || 0) / 100);
   const total = subtotal + handlingFee + delivery;
   const unavailableItems = items.filter((item) => item.stock !== undefined && (item.stock === 0 || item.quantity > item.stock));
