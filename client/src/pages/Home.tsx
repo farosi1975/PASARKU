@@ -148,7 +148,13 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
     // Jangan menampilkan ongkir berdasarkan hasil rute lama saat lokasi berubah.
     setRouteDistanceKm(null);
     if (!origin || !destination) return;
-    getGoogleDrivingDistanceKm(origin, destination).then((distance) => { if (!cancelled) setRouteDistanceKm(distance); }).catch(() => { if (!cancelled) setRouteDistanceKm(null); });
+        getGoogleDrivingDistanceKm(origin, destination).then((distance) => { 
+      if (!cancelled) {
+        const km = distance > 100 ? distance / 1000 : distance;
+        setRouteDistanceKm(km); 
+      } 
+    }).catch(() => { if (!cancelled) setRouteDistanceKm(null); });
+
     return () => { cancelled = true; };
   }, [currentLocation, storeLocation]);
   useEffect(() => {
