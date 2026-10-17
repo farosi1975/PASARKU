@@ -44,6 +44,7 @@ const adminSessionToken = z.string().min(32).max(256);
 const OTP_COOLDOWN_MS = 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_TTL_MS = 5 * 60 * 1000;
+const MANUAL_REGISTRATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const otpLastSent = new Map<string, number>();
 const adminChallenges = new Map<string, { otp: string; expiresAt: number; attempts: number }>();
 const adminSessions = new Map<string, { whatsapp: string; expiresAt: number }>();
@@ -57,6 +58,19 @@ const otpSignature = (payload: string) => createHmac("sha256", process.env.JWT_S
 const createOtpChallengeToken = (scope: "buyer" | "admin", whatsapp: string, otp: string) => {
   const payload = Buffer.from(JSON.stringify({ scope, whatsapp, otpHash: createHmac("sha256", process.env.JWT_SECRET?.trim() || "pasarku-otp-development-secret").update(otp).digest("hex"), expiresAt: Date.now() + OTP_TTL_MS })).toString("base64url");
   return `${payload}.${otpSignature(payload)}`;
+};
+const createBuyerRegistrationToken = (whatsapp: string) => {
+  const payload = Buffer.from(JSON.stringify({ scope: "buyer-registration", whatsapp, issuedAt: Date.now() })).toString("base64url");
+  return `${payload}.${otpSignature(payload)}`;
+};
+const readBuyerRegistrationToken = (token: string, whatsapp: string) => {
+  try {
+    const [payload, signature] = token.split(".");
+    const expected = otpSignature(payload);
+    if (!payload || !signature || expected.length !== signature.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) return false;
+    const value = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { scope?: string; whatsapp?: string; issuedAt?: number };
+    return value.scope === "buyer-registration" && value.whatsapp === whatsapp && !!value.issuedAt && value.issuedAt + MANUAL_REGISTRATION_TTL_MS >= Date.now();
+  } catch { return false; }
 };
 const readOtpChallengeToken = (token?: string) => {
   try {
@@ -238,7 +252,14 @@ export const appRouter = router({
       const values = { name: input.name, whatsapp, village: input.village, address: input.address, verificationStatus: "pending" as const, isBanned: 0 };
       await db.insert(buyerProfiles).values(values).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: values.name, village: values.village, address: values.address, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.name);
-      return { name: input.name, whatsapp };
+      return { name: input.name, whatsapp, registrationToken: createBuyerRegistrationToken(whatsapp) };
+    }),
+    buyerRegistrationStatus: publicProcedure.input(z.object({ whatsapp: phone, registrationToken: z.string().min(20) })).query(async ({ input }) => {
+      const whatsapp = normalizePhone(input.whatsapp);
+      if (!readBuyerRegistrationToken(input.registrationToken, whatsapp)) throw new TRPCError({ code: "UNAUTHORIZED", message: "Token pendaftaran tidak valid atau sudah kedaluwarsa." });
+      const profile = await getBuyerProfile(whatsapp);
+      if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Pendaftaran pembeli belum ditemukan." });
+      return { name: profile.name, whatsapp: profile.whatsapp, status: profile.verificationStatus };
     }),
     requestBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2).optional() })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
@@ -607,7 +628,7 @@ export const appRouter = router({
     }),
     approveSeller: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), status: z.enum(["verified", "rejected"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.id, input.id)).limit(1); const seller = rows[0]; if (!seller) throw new TRPCError({ code: "NOT_FOUND", message: "Pendaftaran penjual tidak ditemukan." }); await db.update(sellerProfiles).set({ verificationStatus: input.status, isBanned: 0, verifiedAt: input.status === "verified" ? new Date() : null }).where(eq(sellerProfiles.id, input.id)); const notification = await notifyVerificationResult(seller.whatsapp, "seller", input.status, seller.shopName); return { success: true as const, notificationSent: notification.sent }; }),
     approveCourier: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), status: z.enum(["verified", "rejected"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); const rows = await db.select().from(courierProfiles).where(eq(courierProfiles.id, input.id)).limit(1); const courier = rows[0]; if (!courier) throw new TRPCError({ code: "NOT_FOUND", message: "Pendaftaran kurir tidak ditemukan." }); await db.update(courierProfiles).set({ verificationStatus: input.status, isBanned: 0, verifiedAt: input.status === "verified" ? new Date() : null }).where(eq(courierProfiles.id, input.id)); const notification = await notifyVerificationResult(courier.whatsapp, "courier", input.status, courier.name); return { success: true as const, notificationSent: notification.sent }; }),
-    approveBuyer: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), status: z.enum(["verified", "unverified"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); const rows = await db.select().from(buyerProfiles).where(eq(buyerProfiles.id, input.id)).limit(1); const buyer = rows[0]; if (!buyer) throw new TRPCError({ code: "NOT_FOUND", message: "Pendaftaran pembeli tidak ditemukan." }); await db.update(buyerProfiles).set({ verificationStatus: input.status, isBanned: 0, updatedAt: new Date() }).where(eq(buyerProfiles.id, input.id)); return { success: true as const }; }),
+    approveBuyer: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), status: z.enum(["verified", "unverified"]) })).mutation(async ({ input }) => { const admin = await requireAdminSession(input.sessionToken); const db = await dbRequired(); const rows = await db.select().from(buyerProfiles).where(eq(buyerProfiles.id, input.id)).limit(1); const buyer = rows[0]; if (!buyer) throw new TRPCError({ code: "NOT_FOUND", message: "Pendaftaran pembeli tidak ditemukan." }); await db.update(buyerProfiles).set({ verificationStatus: input.status, isBanned: 0, updatedAt: new Date() }).where(eq(buyerProfiles.id, input.id)); const message = input.status === "verified" ? `PASARKU: Pendaftaran pembeli Anda telah DISETUJUI oleh Admin ${admin.name}. Akun Anda sekarang aktif. Silakan buka kembali PASARKU.` : "PASARKU: Pendaftaran pembeli Anda belum disetujui Admin. Silakan hubungi Admin PASARKU."; let notificationSent = false; try { await sendFonnteMessage(buyer.whatsapp, message); notificationSent = true; } catch (error) { console.error("[FONNTE] Notifikasi status pembeli gagal:", error instanceof Error ? error.message : error); } return { success: true as const, notificationSent }; }),
     courierProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
       const db = await dbRequired();
       const rows = await db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, avatarUrl: courierProfiles.avatarUrl, vehicle: courierProfiles.vehicle, village: courierProfiles.village, address: courierProfiles.address, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned, verifiedAt: courierProfiles.verifiedAt }).from(courierProfiles).where(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
