@@ -358,7 +358,7 @@ export async function listSellerCouriers() {
 
 export async function getAdminUserDirectory() {
   const db = await getDb();
-  if (!db) return { buyers: [], sellers: [], couriers: [], pendingSellers: [], pendingCouriers: [] };
+  if (!db) return { buyers: [], sellers: [], couriers: [], pendingBuyers: [], pendingSellers: [], pendingCouriers: [] };
   const [buyers, sellers, couriers, orderRows, productRows] = await Promise.all([
     db.select().from(buyerProfiles).orderBy(desc(buyerProfiles.updatedAt)),
     db.select().from(sellerProfiles).orderBy(desc(sellerProfiles.updatedAt)),
@@ -379,6 +379,7 @@ export async function getAdminUserDirectory() {
     buyers: buyers.map((buyer) => ({ ...buyer, orderCount: orderCounts.get(buyer.whatsapp)?.count ?? 0, lastOrderCode: orderCounts.get(buyer.whatsapp)?.lastOrderCode ?? null })),
     sellers: sellers.map((seller) => ({ ...seller, productCount: productCounts.get(seller.id) ?? 0 })),
     couriers,
+    pendingBuyers: buyers.filter((buyer) => buyer.verificationStatus === "pending" || buyer.verificationStatus === "unverified"),
     pendingSellers: sellers.filter((seller) => seller.verificationStatus === "pending" || seller.verificationStatus === "unverified"),
     pendingCouriers: couriers.filter((courier) => courier.verificationStatus === "pending" || courier.verificationStatus === "unverified"),
   };
