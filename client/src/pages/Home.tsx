@@ -178,7 +178,8 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   }, [buyerProfile.data, open]);
   if (!open) return null;
   const hasFreeShipping = items.length > 0 && items.every((item) => item.sellerFreeShipping === true);
-  const delivery = calculateShippingCost(shipping, currentLocation, hasFreeShipping, routeDistanceKm);
+  const delivery = calculateShippingCost(shipping, form.village, hasFreeShipping, routeDistanceKm);
+
   const buyerCoordinates = parseCoordinates(currentLocation);
   const configuredOrigin = parseCoordinates(`${shipping.originLatitude},${shipping.originLongitude}`);
   const effectiveOrigin = storeOrigin || configuredOrigin;
