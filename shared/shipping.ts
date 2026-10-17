@@ -44,6 +44,7 @@ export function distanceBetweenCoordinates(source: { latitude: number; longitude
 export function calculateShippingCost(settings: ShippingSettings, currentLocation?: string | null, freeShipping = false, routeDistanceKm?: number | null) {
   if (freeShipping) return 0;
   
+  // Pastikan mutlak mengambil routeDistanceKm jika ada
   let distanceKm = 1;
   if (routeDistanceKm !== null && routeDistanceKm !== undefined && Number.isFinite(routeDistanceKm) && routeDistanceKm > 0) {
     distanceKm = routeDistanceKm;
@@ -51,8 +52,8 @@ export function calculateShippingCost(settings: ShippingSettings, currentLocatio
     distanceKm = distanceInKm(currentLocation, settings);
   }
 
+  // Murni tarif per km dikali jarak, lalu dikurang diskon 20%
   const gross = Math.ceil(distanceKm * Math.max(0, settings.ratePerKm));
   const discount = Math.min(100, Math.max(0, settings.discountPercent));
   return Math.max(0, Math.round(gross * (1 - discount / 100)));
 }
-
