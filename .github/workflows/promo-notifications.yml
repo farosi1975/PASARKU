@@ -1,0 +1,28 @@
+name: PASARKU Promo Notifications
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  send-promo-notifications:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger PASARKU promo scheduler
+        env:
+          PROMO_CRON_TOKEN: ${{ secrets.PROMO_CRON_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PROMO_CRON_TOKEN}" ]; then
+            echo "PROMO_CRON_TOKEN belum diatur di GitHub Actions secrets."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 60 \
+            --get "https://pasarku.onrender.com/api/internal/promo-notifications" \
+            --data-urlencode "token=${PROMO_CRON_TOKEN}"
+          echo
