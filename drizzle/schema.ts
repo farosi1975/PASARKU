@@ -116,6 +116,22 @@ export const siteSettings = pgTable("site_settings", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("userAgent"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export const promoNotificationLogs = pgTable("promo_notification_logs", {
+  id: serial("id").primaryKey(),
+  slotId: varchar("slotId", { length: 120 }).notNull().unique(),
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+});
+
 export const supportTicketStatusEnum = pgEnum("support_ticket_status", ["open", "in_progress", "resolved"]);
 
 export const supportTickets = pgTable("support_tickets", {

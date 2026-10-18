@@ -4,13 +4,14 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminProfile, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole } from "./db";
+import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminProfile, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole, savePushSubscription, removePushSubscription } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "./db-tables";
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendFonnteMessage } from "./fonnte";
 import { storageGetSignedUrl, storagePut, storagePutPrivate } from "./storage";
 import { calculateShippingCost, parseCoordinates } from "../shared/shipping";
+import { getPushPublicKey } from "./pushNotifications";
 
 const phone = z.string().min(10).max(32);
 const dbRequired = async () => { const db = await getDb(); if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database belum tersedia." }); return db; };
@@ -240,8 +241,11 @@ export const appRouter = router({
     logout: publicProcedure.mutation(({ ctx }) => { const cookieOptions = getSessionCookieOptions(ctx.req); ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 }); return { success: true } as const; }),
   }),
   marketplace: router({
-    products: publicProcedure.query(() => listApprovedProducts()),
-    openStores: publicProcedure.query(() => listOpenStores()),
+  products: publicProcedure.query(() => listApprovedProducts()),
+  openStores: publicProcedure.query(() => listOpenStores()),
+    pushPublicKey: publicProcedure.query(() => ({ publicKey: getPushPublicKey() })),
+    subscribeToPush: publicProcedure.input(z.object({ endpoint: z.string().url().max(2048), keys: z.object({ p256dh: z.string().min(16).max(256), auth: z.string().min(8).max(256) }), userAgent: z.string().max(500).optional() })).mutation(({ input }) => savePushSubscription(input)),
+    unsubscribeFromPush: publicProcedure.input(z.object({ endpoint: z.string().url().max(2048) })).mutation(({ input }) => removePushSubscription(input.endpoint)),
     storeDetail: publicProcedure.input(z.object({ sellerId: z.number().int().positive() })).query(({ input }) => getPublicStoreDetail(input.sellerId)),
     recordVisit: publicProcedure.mutation(() => recordVisitorVisit()),
     registerBuyer: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().trim().min(2).max(160), village: z.string().trim().min(2).max(80), address: z.string().trim().min(2).max(500) })).mutation(async ({ input }) => {

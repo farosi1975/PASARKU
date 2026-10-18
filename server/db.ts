@@ -5,7 +5,7 @@ import { Pool } from "pg";
 import { createPool as createMySqlPool } from "mysql2/promise";
 import { ENV } from "./_core/env";
 import type { InsertUser } from "../drizzle/schema";
-import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, databaseDialect } from "./db-tables";
+import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, pushSubscriptions, promoNotificationLogs, databaseDialect } from "./db-tables";
 
 let _pool: Pool | null = null;
 let _mysqlPool: ReturnType<typeof createMySqlPool> | null = null;
@@ -46,6 +46,8 @@ const ensureMySqlRuntimeColumns = async () => {
     const code = (error as { code?: string }).code;
     if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom lokasi kurir belum dapat disiapkan:", error instanceof Error ? error.message : error);
   }
+  try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (id int auto_increment primary key, endpoint varchar(512) not null unique, p256dh text not null, auth text not null, userAgent varchar(500) null, createdAt timestamp not null default current_timestamp, updatedAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel subscription push belum dapat disiapkan:", error instanceof Error ? error.message : error); }
+  try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_logs (id int auto_increment primary key, slotId varchar(120) not null unique, sentAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel log promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
 };
 
 export async function getDb(): Promise<CompatibleDatabase | null> {
@@ -57,6 +59,8 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         await ensureMySqlRuntimeColumns();
       } else {
         _pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined });
+        await _pool.query(`CREATE TABLE IF NOT EXISTS "push_subscriptions" ("id" serial PRIMARY KEY, "endpoint" text NOT NULL UNIQUE, "p256dh" text NOT NULL, "auth" text NOT NULL, "userAgent" text, "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL)`);
+        await _pool.query(`CREATE TABLE IF NOT EXISTS "promo_notification_logs" ("id" serial PRIMARY KEY, "slotId" varchar(120) NOT NULL UNIQUE, "sentAt" timestamp DEFAULT now() NOT NULL)`);
         _db = drizzlePostgres(_pool);
       }
       console.info(`[Database] Connected using ${databaseDialect} adapter.`);
@@ -182,6 +186,41 @@ export async function saveSiteSettings(input: Partial<Omit<typeof DEFAULT_SITE_S
   const { id: _id, ...values } = { ...current, ...input };
   await db.insert(siteSettings).values({ id: 1, ...values }).onConflictDoUpdate({ target: siteSettings.id, set: { ...values, updatedAt: new Date() } });
   return getSiteSettings();
+}
+
+export type PushSubscriptionInput = { endpoint: string; keys: { p256dh: string; auth: string }; userAgent?: string };
+
+export async function savePushSubscription(input: PushSubscriptionInput) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  await db.insert(pushSubscriptions).values({ endpoint: input.endpoint, p256dh: input.keys.p256dh, auth: input.keys.auth, userAgent: input.userAgent ?? null }).onConflictDoUpdate({ target: pushSubscriptions.endpoint, set: { p256dh: input.keys.p256dh, auth: input.keys.auth, userAgent: input.userAgent ?? null, updatedAt: new Date() } });
+  return { success: true } as const;
+}
+
+export async function removePushSubscription(endpoint: string) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  return { success: true } as const;
+}
+
+export async function listPushSubscriptions() {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(pushSubscriptions);
+}
+
+export async function deletePushSubscription(endpoint: string) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+}
+
+export async function hasPromoNotificationBeenSent(slotId: string) {
+  const db = await getDb(); if (!db) return false;
+  const rows = await db.select({ id: promoNotificationLogs.id }).from(promoNotificationLogs).where(eq(promoNotificationLogs.slotId, slotId)).limit(1);
+  return Boolean(rows[0]);
+}
+
+export async function markPromoNotificationSent(slotId: string) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  await db.insert(promoNotificationLogs).values({ slotId }).onConflictDoUpdate({ target: promoNotificationLogs.slotId, set: { sentAt: new Date() } });
 }
 
 export async function createSupportTicket(input: { ticketCode: string; customerName: string; whatsapp: string; context: string; message: string }) {

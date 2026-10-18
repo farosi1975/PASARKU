@@ -16,6 +16,8 @@ import Login from "./pages/Login";
 import Seller from "./pages/Seller";
 import BuyerProfile from "./pages/BuyerProfile";
 import PwaInstallPrompt from "./components/PwaInstallPrompt";
+import PushPromoPrompt from "./components/PushPromoPrompt";
+import "./push-promo.css";
 import { trpc } from "./lib/trpc";
 
 function VisitorTracker() {
@@ -34,7 +36,7 @@ function Router() {
 }
 
 function App() {
-  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><PwaInstallPrompt /><VisitorTracker /><CartProvider><Router /></CartProvider></TooltipProvider></ThemeProvider></ErrorBoundary>;
+  return <ErrorBoundary><ThemeProvider defaultTheme="light"><TooltipProvider><Toaster /><PwaInstallPrompt /><PushPromoPrompt /><VisitorTracker /><CartProvider><Router /></CartProvider></TooltipProvider></ThemeProvider></ErrorBoundary>;
 }
 
 export default App;

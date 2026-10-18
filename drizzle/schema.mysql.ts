@@ -110,6 +110,22 @@ export const siteSettings = mysqlTable("site_settings", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+export const pushSubscriptions = mysqlTable("push_subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  endpoint: varchar("endpoint", { length: 512 }).notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("userAgent"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export const promoNotificationLogs = mysqlTable("promo_notification_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  slotId: varchar("slotId", { length: 120 }).notNull().unique(),
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+});
+
 export const supportTickets = mysqlTable("support_tickets", {
   id: int("id").autoincrement().primaryKey(),
   ticketCode: varchar("ticketCode", { length: 32 }).notNull().unique(),
