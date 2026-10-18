@@ -8,6 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { sendDuePromoNotifications } from "../pushNotifications";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -36,6 +37,12 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  app.get("/api/internal/promo-notifications", async (req, res) => {
+    const expected = process.env.PROMO_CRON_TOKEN?.trim();
+    if (!expected || req.query.token !== expected) return res.status(401).json({ success: false, message: "Unauthorized" });
+    try { return res.json({ success: true, ...(await sendDuePromoNotifications()) }); }
+    catch (error) { return res.status(500).json({ success: false, message: error instanceof Error ? error.message : "Promo notification failed" }); }
+  });
   // tRPC API
   app.use(
     "/api/trpc",
