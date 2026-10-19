@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
 const DISMISSED_KEY = "pasarku-promo-push-dismissed";
+const INSTALL_DISMISSED_KEY = "pasarku-install-prompt-dismissed-v2";
 
 function base64UrlToBytes(value: string) {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
@@ -22,7 +23,10 @@ export default function PushPromoPrompt() {
     if (!pushKey.data?.publicKey || !("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
     if (Notification.permission === "granted" || Notification.permission === "denied") return;
     if (window.localStorage.getItem(DISMISSED_KEY) === "1") return;
-    setVisible(true);
+    const reveal = () => setVisible(true);
+    if (window.localStorage.getItem(INSTALL_DISMISSED_KEY) === "1" || window.matchMedia("(display-mode: standalone)").matches) reveal();
+    window.addEventListener("pasarku-install-prompt-closed", reveal);
+    return () => window.removeEventListener("pasarku-install-prompt-closed", reveal);
   }, [pushKey.data?.publicKey]);
 
   const enable = async () => {
