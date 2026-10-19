@@ -78,6 +78,16 @@ export const buyerProfiles = pgTable("buyer_profiles", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+export const whatsappRegistrationRequests = pgTable("whatsapp_registration_requests", {
+  id: serial("id").primaryKey(),
+  requestCode: varchar("requestCode", { length: 40 }).notNull().unique(),
+  whatsapp: varchar("whatsapp", { length: 32 }),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
 export const shippingSettings = pgTable("shipping_settings", {
   id: serial("id").primaryKey(),
   ratePerKm: integer("ratePerKm").default(3000).notNull(),

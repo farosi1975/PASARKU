@@ -48,6 +48,7 @@ const ensureMySqlRuntimeColumns = async () => {
   }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (id int auto_increment primary key, endpoint varchar(512) not null unique, p256dh text not null, auth text not null, userAgent varchar(500) null, createdAt timestamp not null default current_timestamp, updatedAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel subscription push belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_logs (id int auto_increment primary key, slotId varchar(120) not null unique, sentAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel log promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
+  try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS whatsapp_registration_requests (id int auto_increment primary key, requestCode varchar(40) not null unique, whatsapp varchar(32) null, status varchar(20) not null default 'pending', expiresAt timestamp not null, createdAt timestamp not null default current_timestamp, updatedAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel pendaftaran WhatsApp belum dapat disiapkan:", error instanceof Error ? error.message : error); }
 };
 
 export async function getDb(): Promise<CompatibleDatabase | null> {
@@ -61,6 +62,7 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         _pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined });
         await _pool.query(`CREATE TABLE IF NOT EXISTS "push_subscriptions" ("id" serial PRIMARY KEY, "endpoint" text NOT NULL UNIQUE, "p256dh" text NOT NULL, "auth" text NOT NULL, "userAgent" text, "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL)`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "promo_notification_logs" ("id" serial PRIMARY KEY, "slotId" varchar(120) NOT NULL UNIQUE, "sentAt" timestamp DEFAULT now() NOT NULL)`);
+        await _pool.query(`CREATE TABLE IF NOT EXISTS "whatsapp_registration_requests" ("id" serial PRIMARY KEY, "requestCode" varchar(40) NOT NULL UNIQUE, "whatsapp" varchar(32), "status" varchar(20) DEFAULT 'pending' NOT NULL, "expiresAt" timestamp NOT NULL, "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL)`);
         _db = drizzlePostgres(_pool);
       }
       console.info(`[Database] Connected using ${databaseDialect} adapter.`);

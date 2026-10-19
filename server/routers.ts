@@ -12,6 +12,7 @@ import { sendFonnteMessage } from "./fonnte";
 import { storageGetSignedUrl, storagePut, storagePutPrivate } from "./storage";
 import { calculateShippingCost, parseCoordinates } from "../shared/shipping";
 import { getPushPublicKey } from "./pushNotifications";
+import { createWhatsAppRegistrationRequest, getWhatsAppRegistrationStatus } from "./whatsappRegistration";
 
 const phone = z.string().min(10).max(32);
 const dbRequired = async () => { const db = await getDb(); if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database belum tersedia." }); return db; };
@@ -265,6 +266,8 @@ export const appRouter = router({
       if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Pendaftaran pembeli belum ditemukan." });
       return { name: profile.name, whatsapp: profile.whatsapp, status: profile.verificationStatus };
     }),
+    createWhatsAppRegistration: publicProcedure.mutation(() => createWhatsAppRegistrationRequest()),
+    whatsappRegistrationStatus: publicProcedure.input(z.object({ requestCode: z.string().regex(/^[A-Z0-9]{8,20}$/) })).query(({ input }) => getWhatsAppRegistrationStatus(input.requestCode)),
     requestBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2).optional() })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
       beginOtpSend("buyer", whatsapp);

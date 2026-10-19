@@ -9,6 +9,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { sendDuePromoNotifications } from "../pushNotifications";
+import { processFonnteIncomingRegistration } from "../whatsappRegistration";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -37,6 +38,18 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  app.post("/api/webhooks/fonnte/incoming", async (req, res) => {
+    const expectedSecret = process.env.FONNTE_WEBHOOK_SECRET?.trim();
+    const providedSecret = String(req.get("x-webhook-secret") || req.get("x-fonnte-secret") || req.body?.secret || req.body?.secret_key || "").trim();
+    if (expectedSecret && providedSecret !== expectedSecret) return res.status(401).json({ success: false, message: "Webhook secret tidak valid." });
+    try {
+      const result = await processFonnteIncomingRegistration({ sender: req.body?.sender, message: req.body?.message });
+      return res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("[FONNTE] Webhook pendaftaran gagal:", error instanceof Error ? error.message : error);
+      return res.status(500).json({ success: false, message: "Webhook belum dapat diproses." });
+    }
+  });
   app.get("/api/internal/promo-notifications", async (req, res) => {
     const expected = process.env.PROMO_CRON_TOKEN?.trim();
     if (!expected || req.query.token !== expected) return res.status(401).json({ success: false, message: "Unauthorized" });

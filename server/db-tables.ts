@@ -14,6 +14,7 @@ export const {
   sellerProfiles,
   courierProfiles,
   buyerProfiles,
+  whatsappRegistrationRequests,
   shippingSettings,
   siteSettings,
   supportTickets,

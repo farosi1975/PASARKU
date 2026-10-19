@@ -72,6 +72,16 @@ export const buyerProfiles = mysqlTable("buyer_profiles", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+export const whatsappRegistrationRequests = mysqlTable("whatsapp_registration_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  requestCode: varchar("requestCode", { length: 40 }).notNull().unique(),
+  whatsapp: varchar("whatsapp", { length: 32 }),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
 export const shippingSettings = mysqlTable("shipping_settings", {
   id: int("id").autoincrement().primaryKey(),
   ratePerKm: int("ratePerKm").default(3000).notNull(),
