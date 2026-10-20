@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, serial, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 export const verificationStatusEnum = pgEnum("verification_status", ["pending", "verified", "rejected", "unverified"]);
@@ -142,6 +142,14 @@ export const promoNotificationLogs = pgTable("promo_notification_logs", {
   sentAt: timestamp("sentAt").defaultNow().notNull(),
 });
 
+export const promoNotificationDeliveries = pgTable("promo_notification_deliveries", {
+  id: serial("id").primaryKey(),
+  slotId: varchar("slotId", { length: 120 }).notNull(),
+  endpoint: text("endpoint").notNull(),
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+}, (table) => ({
+  slotEndpointUnique: uniqueIndex("promo_notification_deliveries_slot_endpoint_idx").on(table.slotId, table.endpoint),
+}));
 export const supportTicketStatusEnum = pgEnum("support_ticket_status", ["open", "in_progress", "resolved"]);
 
 export const supportTickets = pgTable("support_tickets", {

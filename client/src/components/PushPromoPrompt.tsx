@@ -21,12 +21,24 @@ export default function PushPromoPrompt() {
 
   useEffect(() => {
     if (!pushKey.data?.publicKey || !("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
-    if (Notification.permission === "granted" || Notification.permission === "denied") return;
-    if (window.localStorage.getItem(DISMISSED_KEY) === "1") return;
+    if (Notification.permission === "denied" || window.localStorage.getItem(DISMISSED_KEY) === "1") return;
+    let cancelled = false;
+    const syncOrReveal = async () => {
+      const registration = await navigator.serviceWorker.ready;
+      const existing = await registration.pushManager.getSubscription();
+      if (existing) {
+        const json = existing.toJSON();
+        if (json.endpoint && json.keys?.p256dh && json.keys.auth) {
+          await subscribe.mutateAsync({ endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth }, userAgent: navigator.userAgent }).catch(() => undefined);
+        }
+        return;
+      }
+      if (!cancelled && (Notification.permission === "granted" || window.localStorage.getItem(INSTALL_DISMISSED_KEY) === "1" || window.matchMedia("(display-mode: standalone)").matches)) setVisible(true);
+    };
+    void syncOrReveal();
     const reveal = () => setVisible(true);
-    if (window.localStorage.getItem(INSTALL_DISMISSED_KEY) === "1" || window.matchMedia("(display-mode: standalone)").matches) reveal();
     window.addEventListener("pasarku-install-prompt-closed", reveal);
-    return () => window.removeEventListener("pasarku-install-prompt-closed", reveal);
+    return () => { cancelled = true; window.removeEventListener("pasarku-install-prompt-closed", reveal); };
   }, [pushKey.data?.publicKey]);
 
   const enable = async () => {

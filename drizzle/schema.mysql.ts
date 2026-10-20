@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -136,6 +136,14 @@ export const promoNotificationLogs = mysqlTable("promo_notification_logs", {
   sentAt: timestamp("sentAt").defaultNow().notNull(),
 });
 
+export const promoNotificationDeliveries = mysqlTable("promo_notification_deliveries", {
+  id: int("id").autoincrement().primaryKey(),
+  slotId: varchar("slotId", { length: 120 }).notNull(),
+  endpoint: varchar("endpoint", { length: 512 }).notNull(),
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+}, (table) => ({
+  slotEndpointUnique: uniqueIndex("promo_notification_deliveries_slot_endpoint_idx").on(table.slotId, table.endpoint),
+}));
 export const supportTickets = mysqlTable("support_tickets", {
   id: int("id").autoincrement().primaryKey(),
   ticketCode: varchar("ticketCode", { length: 32 }).notNull().unique(),

@@ -27,6 +27,7 @@ export const {
   orderItems,
   pushSubscriptions,
   promoNotificationLogs,
+  promoNotificationDeliveries,
 } = tables;
 
 export const databaseDialect = isMySql ? "mysql" : "postgres" as const;

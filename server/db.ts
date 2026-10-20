@@ -5,7 +5,7 @@ import { Pool } from "pg";
 import { createPool as createMySqlPool } from "mysql2/promise";
 import { ENV } from "./_core/env";
 import type { InsertUser } from "../drizzle/schema";
-import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, pushSubscriptions, promoNotificationLogs, databaseDialect } from "./db-tables";
+import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, pushSubscriptions, promoNotificationLogs, promoNotificationDeliveries, databaseDialect } from "./db-tables";
 
 let _pool: Pool | null = null;
 let _mysqlPool: ReturnType<typeof createMySqlPool> | null = null;
@@ -48,6 +48,7 @@ const ensureMySqlRuntimeColumns = async () => {
   }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (id int auto_increment primary key, endpoint varchar(512) not null unique, p256dh text not null, auth text not null, userAgent varchar(500) null, createdAt timestamp not null default current_timestamp, updatedAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel subscription push belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_logs (id int auto_increment primary key, slotId varchar(120) not null unique, sentAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel log promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
+  try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_deliveries (id int auto_increment primary key, slotId varchar(120) not null, endpoint varchar(512) not null, sentAt timestamp not null default current_timestamp, unique key promo_notification_deliveries_slot_endpoint_idx (slotId, endpoint))`); } catch (error) { console.warn("[Database] Tabel delivery promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS whatsapp_registration_requests (id int auto_increment primary key, requestCode varchar(40) not null unique, whatsapp varchar(32) null, status varchar(20) not null default 'pending', expiresAt timestamp not null, createdAt timestamp not null default current_timestamp, updatedAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel pendaftaran WhatsApp belum dapat disiapkan:", error instanceof Error ? error.message : error); }
 };
 
@@ -62,6 +63,7 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         _pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined });
         await _pool.query(`CREATE TABLE IF NOT EXISTS "push_subscriptions" ("id" serial PRIMARY KEY, "endpoint" text NOT NULL UNIQUE, "p256dh" text NOT NULL, "auth" text NOT NULL, "userAgent" text, "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL)`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "promo_notification_logs" ("id" serial PRIMARY KEY, "slotId" varchar(120) NOT NULL UNIQUE, "sentAt" timestamp DEFAULT now() NOT NULL)`);
+        await _pool.query(`CREATE TABLE IF NOT EXISTS "promo_notification_deliveries" ("id" serial PRIMARY KEY, "slotId" varchar(120) NOT NULL, "endpoint" text NOT NULL, "sentAt" timestamp DEFAULT now() NOT NULL, CONSTRAINT "promo_notification_deliveries_slot_endpoint_idx" UNIQUE ("slotId", "endpoint"))`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "whatsapp_registration_requests" ("id" serial PRIMARY KEY, "requestCode" varchar(40) NOT NULL UNIQUE, "whatsapp" varchar(32), "status" varchar(20) DEFAULT 'pending' NOT NULL, "expiresAt" timestamp NOT NULL, "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL)`);
         _db = drizzlePostgres(_pool);
       }
@@ -212,6 +214,20 @@ export async function listPushSubscriptions() {
 export async function deletePushSubscription(endpoint: string) {
   const db = await getDb(); if (!db) return;
   await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+}
+
+export async function hasPromoDeliveryBeenSent(slotId: string, endpoint: string) {
+  const db = await getDb(); if (!db) return false;
+  const rows = await db.select({ id: promoNotificationDeliveries.id }).from(promoNotificationDeliveries).where(and(eq(promoNotificationDeliveries.slotId, slotId), eq(promoNotificationDeliveries.endpoint, endpoint))).limit(1);
+  return Boolean(rows[0]);
+}
+
+export async function markPromoDeliverySent(slotId: string, endpoint: string) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  try { await db.insert(promoNotificationDeliveries).values({ slotId, endpoint }); } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    if (!message.includes("duplicate") && !message.includes("unique")) throw error;
+  }
 }
 
 export async function hasPromoNotificationBeenSent(slotId: string) {

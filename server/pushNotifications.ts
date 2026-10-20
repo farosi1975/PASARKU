@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { deletePushSubscription, hasPromoNotificationBeenSent, listPushSubscriptions, markPromoNotificationSent, getSiteSettings } from "./db";
+import { deletePushSubscription, hasPromoDeliveryBeenSent, listPushSubscriptions, markPromoDeliverySent, getSiteSettings } from "./db";
 
 type PromoSlot = { id?: string; title?: string; description?: string; cta?: string; active?: boolean; startsAt?: string | Date | null; endsAt?: string | Date | null };
 
@@ -47,7 +47,7 @@ export async function sendDuePromoNotifications() {
   const subscriptions = await listPushSubscriptions();
   let sent = 0;
   for (const slot of dueSlots) {
-    if (!slot.id || await hasPromoNotificationBeenSent(slot.id)) continue;
+    if (!slot.id) continue;
     const payload = JSON.stringify({
       title: slot.title || "Promo PASARKU",
       body: slot.description || "Ada promo baru dari toko lokal PASARKU.",
@@ -56,7 +56,9 @@ export async function sendDuePromoNotifications() {
     });
     for (const subscription of subscriptions) {
       try {
+        if (await hasPromoDeliveryBeenSent(slot.id, subscription.endpoint)) continue;
         await webpush.sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } }, payload);
+        await markPromoDeliverySent(slot.id, subscription.endpoint);
         sent += 1;
       } catch (error) {
         const statusCode = (error as { statusCode?: number }).statusCode;
@@ -64,7 +66,6 @@ export async function sendDuePromoNotifications() {
         else console.warn("[Push] Pengiriman promo gagal:", error instanceof Error ? error.message : error);
       }
     }
-    await markPromoNotificationSent(slot.id);
   }
   return { sent } as const;
 }
