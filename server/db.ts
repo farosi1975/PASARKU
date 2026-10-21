@@ -260,6 +260,18 @@ export async function updateSupportTicketStatus(id: number, status: "open" | "in
   return rows[0] ?? null;
 }
 
+export async function deleteSupportTicket(id: number, admin: { name: string; whatsapp: string }) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  const rows = await db.select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+  const ticket = rows[0];
+  if (!ticket) throw new Error("Tiket bantuan tidak ditemukan.");
+  await db.transaction(async (tx) => {
+    await tx.delete(supportTickets).where(eq(supportTickets.id, id));
+    await tx.insert(adminAuditLogs).values({ adminName: admin.name, adminWhatsapp: admin.whatsapp, action: "delete_support_ticket", targetRole: "support", targetId: id, targetName: ticket.ticketCode, details: `Tiket bantuan ${ticket.ticketCode} dihapus oleh Admin.` });
+  });
+  return { success: true as const, id };
+}
+
 export async function getBuyerProfile(whatsapp: string) {
   const db = await getDb(); if (!db) return null;
   const rows = await db.select().from(buyerProfiles).where(eq(buyerProfiles.whatsapp, whatsapp)).limit(1);
@@ -311,6 +323,7 @@ export async function deleteAdminProfile(id: number, admin: { name: string; what
     const targetRows = await tx.select().from(adminProfiles).where(eq(adminProfiles.id, id)).limit(1);
     const target = targetRows[0];
     if (!target) throw new Error("Admin tidak ditemukan.");
+    if (target.whatsapp === "082330503206") throw new Error("Admin permanen tidak dapat dihapus.");
     if (target.whatsapp === admin.whatsapp) throw new Error("Admin yang sedang digunakan tidak dapat menghapus dirinya sendiri.");
     await tx.delete(adminProfiles).where(eq(adminProfiles.id, id));
     const accountRows = await tx.select().from(userAccounts).where(eq(userAccounts.whatsapp, target.whatsapp)).limit(1);
@@ -352,6 +365,19 @@ export async function listOrders() {
   const db = await getDb(); if (!db) return [];
   const rows = await db.select().from(orders).orderBy(desc(orders.createdAt));
   return Promise.all(rows.map(async (order) => ({ ...order, items: await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)) })));
+}
+
+export async function deleteOrder(orderCode: string, admin: { name: string; whatsapp: string }) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  const rows = await db.select().from(orders).where(eq(orders.orderCode, orderCode)).limit(1);
+  const order = rows[0];
+  if (!order) throw new Error("Catatan transaksi tidak ditemukan.");
+  await db.transaction(async (tx) => {
+    await tx.delete(orderItems).where(eq(orderItems.orderId, order.id));
+    await tx.delete(orders).where(eq(orders.id, order.id));
+    await tx.insert(adminAuditLogs).values({ adminName: admin.name, adminWhatsapp: admin.whatsapp, action: "delete_order", targetRole: "order", targetId: order.id, targetName: order.orderCode, details: `Catatan transaksi ${order.orderCode} dihapus oleh Admin.` });
+  });
+  return { success: true as const, orderCode };
 }
 
 export async function getOrderWithItems(orderCode: string) {
