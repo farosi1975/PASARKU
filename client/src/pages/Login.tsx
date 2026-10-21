@@ -39,6 +39,21 @@ export default function Login() {
   const whatsappStatus = trpc.marketplace.whatsappRegistrationStatus.useQuery({ requestCode: whatsappRequestCode || "00000000" }, { enabled: Boolean(whatsappRequestCode), refetchInterval: whatsappRequestCode ? 3000 : false });
 
   useEffect(() => {
+    if (!whatsappRequestCode) return;
+    setMode((current) => current === "login" ? "registerWhatsApp" : current);
+    const refreshStatus = () => { void whatsappStatus.refetch(); };
+    const handleVisibility = () => { if (document.visibilityState === "visible") refreshStatus(); };
+    window.addEventListener("focus", refreshStatus);
+    window.addEventListener("pageshow", refreshStatus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", refreshStatus);
+      window.removeEventListener("pageshow", refreshStatus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [whatsappRequestCode, whatsappStatus.refetch]);
+
+  useEffect(() => {
     if (registrationStatus.data?.status === "verified" && pendingRegistration) {
       window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify({ name: registrationStatus.data.name, phone: registrationStatus.data.whatsapp, mode: "registerManual", signedInAt: new Date().toISOString() }));
       window.localStorage.removeItem(PENDING_REGISTRATION_KEY); setPendingRegistration(null); window.dispatchEvent(new Event(AUTH_EVENT));
@@ -51,7 +66,8 @@ export default function Login() {
     if (status?.status === "verified" && status.whatsapp) {
       window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify({ name: `Warga ${status.whatsapp.slice(-4)}`, phone: status.whatsapp, mode: "registerWhatsApp", signedInAt: new Date().toISOString() }));
       window.localStorage.removeItem(WHATSAPP_REGISTRATION_KEY); setWhatsappRequestCode(null); window.dispatchEvent(new Event(AUTH_EVENT));
-      toast.success("Berhasil masuk ke PASARKU", { description: "Nomor WhatsApp Anda sudah terdaftar. Silakan mulai belanja." }); navigate("/");
+      toast.success("Berhasil masuk ke PASARKU", { description: "Nomor WhatsApp Anda sudah terdaftar. Silakan mulai belanja." });
+      window.location.replace("/");
     }
   }, [whatsappStatus.data, navigate]);
 
