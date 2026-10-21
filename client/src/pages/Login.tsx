@@ -34,7 +34,6 @@ export default function Login() {
   const verifyBuyerOtp = trpc.marketplace.verifyBuyerOtp.useMutation();
   const registerBuyer = trpc.marketplace.registerBuyer.useMutation();
   const createWhatsAppRegistration = trpc.marketplace.createWhatsAppRegistration.useMutation();
-  const shippingSettings = trpc.marketplace.shippingSettings.useQuery();
   const registrationStatus = trpc.marketplace.buyerRegistrationStatus.useQuery(pendingRegistration ? { whatsapp: pendingRegistration.phone, registrationToken: pendingRegistration.registrationToken } : { whatsapp: "0000000000", registrationToken: "pending-registration-check" }, { enabled: Boolean(pendingRegistration), refetchInterval: pendingRegistration ? 5000 : false });
   const whatsappStatus = trpc.marketplace.whatsappRegistrationStatus.useQuery({ requestCode: whatsappRequestCode || "00000000" }, { enabled: Boolean(whatsappRequestCode), refetchInterval: whatsappRequestCode ? 3000 : false });
 
@@ -86,7 +85,8 @@ export default function Login() {
     try {
       const result = await createWhatsAppRegistration.mutateAsync();
       setWhatsappRequestCode(result.requestCode); window.localStorage.setItem(WHATSAPP_REGISTRATION_KEY, result.requestCode);
-      const target = normalizeWhatsApp(shippingSettings.data?.adminWhatsapp || "6281456015901");
+      // Pendaftaran masuk melalui webhook pada device FONNTE, bukan nomor Admin penerima notifikasi.
+      const target = "6281456015901";
       const message = encodeURIComponent(`DAFTAR PASARKU ${result.requestCode}`);
       const appUrl = `whatsapp://send?phone=${target}&text=${message}`;
       const webUrl = `https://wa.me/${target}?text=${message}`;
