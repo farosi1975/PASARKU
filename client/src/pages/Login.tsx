@@ -88,8 +88,15 @@ export default function Login() {
       setWhatsappRequestCode(result.requestCode); window.localStorage.setItem(WHATSAPP_REGISTRATION_KEY, result.requestCode);
       const target = normalizeWhatsApp(shippingSettings.data?.adminWhatsapp || "6281456015901");
       const message = encodeURIComponent(`DAFTAR PASARKU ${result.requestCode}`);
-      const url = `https://wa.me/${target}?text=${message}`;
-      if (popup) popup.location.href = url; else window.location.href = url;
+      const appUrl = `whatsapp://send?phone=${target}&text=${message}`;
+      const webUrl = `https://wa.me/${target}?text=${message}`;
+      if (popup) {
+        popup.location.href = appUrl;
+        window.setTimeout(() => { if (!popup.closed) popup.location.href = webUrl; }, 1800);
+      } else {
+        window.location.href = appUrl;
+        window.setTimeout(() => { if (!document.hidden) window.location.href = webUrl; }, 1800);
+      }
       toast.success("WhatsApp dibuka", { description: "Tekan Kirim pada pesan yang sudah disiapkan. Setelah itu PASARKU akan masuk otomatis." });
     } catch (error) { popup?.close(); toast.error("Pendaftaran WhatsApp belum siap", { description: error instanceof Error ? error.message : "Coba lagi beberapa saat." }); }
   };
