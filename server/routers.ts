@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { createSupportTicket, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminProfile, deleteOrder, deleteSupportTicket, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole, savePushSubscription, removePushSubscription } from "./db";
+import { createSupportTicket, findBuyerByReferralCode, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminProfile, deleteOrder, deleteSupportTicket, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole, savePushSubscription, removePushSubscription } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "./db-tables";
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -51,7 +51,7 @@ const otpLastSent = new Map<string, number>();
 const adminChallenges = new Map<string, { otp: string; expiresAt: number; attempts: number }>();
 const adminSessions = new Map<string, { whatsapp: string; expiresAt: number }>();
 const ADMIN_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const buyerChallenges = new Map<string, { otp: string; name?: string; expiresAt: number; attempts: number }>();
+const buyerChallenges = new Map<string, { otp: string; name?: string; referralCode?: string; expiresAt: number; attempts: number }>();
 const sellerChallenges = new Map<string, { otp: string; shopName: string; ownerName: string; village: string; expiresAt: number; attempts: number }>();
 const courierChallenges = new Map<string, { otp: string; name: string; vehicle: string; expiresAt: number; attempts: number }>();
 const normalizePhone = (value: string) => { const digits = value.replace(/\D/g, ""); return digits.startsWith("0") ? `62${digits.slice(1)}` : digits; };
@@ -249,13 +249,15 @@ export const appRouter = router({
     unsubscribeFromPush: publicProcedure.input(z.object({ endpoint: z.string().url().max(2048) })).mutation(({ input }) => removePushSubscription(input.endpoint)),
     storeDetail: publicProcedure.input(z.object({ sellerId: z.number().int().positive() })).query(({ input }) => getPublicStoreDetail(input.sellerId)),
     recordVisit: publicProcedure.mutation(() => recordVisitorVisit()),
-    registerBuyer: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().trim().min(2).max(160), village: z.string().trim().min(2).max(80), address: z.string().trim().min(2).max(500) })).mutation(async ({ input }) => {
+    registerBuyer: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().trim().min(2).max(160), village: z.string().trim().min(2).max(80), address: z.string().trim().min(2).max(500), referralCode: z.string().trim().min(4).max(24).optional() })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
       const existing = await getBuyerProfile(whatsapp);
       if (existing?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli ini diblokir oleh Admin PASARKU." });
+      const referralCode = input.referralCode?.toUpperCase();
+      if (referralCode && (!existing || !existing.referredByCode)) { const referrer = await findBuyerByReferralCode(referralCode); if (!referrer || referrer.whatsapp === whatsapp) throw new TRPCError({ code: "BAD_REQUEST", message: "Kode referral tidak ditemukan atau tidak dapat dipakai sendiri." }); }
       const db = await dbRequired();
-      const values = { name: input.name, whatsapp, village: input.village, address: input.address, verificationStatus: "pending" as const, isBanned: 0 };
-      await db.insert(buyerProfiles).values(values).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: values.name, village: values.village, address: values.address, updatedAt: new Date() } });
+      const values = { name: input.name, whatsapp, village: input.village, address: input.address, referredByCode: referralCode || existing?.referredByCode || null, verificationStatus: "pending" as const, isBanned: 0 };
+      await db.insert(buyerProfiles).values(values).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: values.name, village: values.village, address: values.address, referredByCode: values.referredByCode, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.name);
       return { name: input.name, whatsapp, registrationToken: createBuyerRegistrationToken(whatsapp) };
     }),
@@ -268,11 +270,13 @@ export const appRouter = router({
     }),
     createWhatsAppRegistration: publicProcedure.mutation(() => createWhatsAppRegistrationRequest()),
     whatsappRegistrationStatus: publicProcedure.input(z.object({ requestCode: z.string().regex(/^[A-Z0-9]{8,20}$/) })).query(({ input }) => getWhatsAppRegistrationStatus(input.requestCode)),
-    requestBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2).optional() })).mutation(async ({ input }) => {
+    requestBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2).optional(), referralCode: z.string().trim().min(4).max(24).optional() })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
+      const referralCode = input.referralCode?.toUpperCase();
+      if (referralCode) { const referrer = await findBuyerByReferralCode(referralCode); if (!referrer || referrer.whatsapp === whatsapp) throw new TRPCError({ code: "BAD_REQUEST", message: "Kode referral tidak ditemukan atau tidak dapat dipakai sendiri." }); }
       beginOtpSend("buyer", whatsapp);
       const otp = String(randomInt(100000, 1000000));
-      buyerChallenges.set(whatsapp, { otp, name: input.name?.trim(), expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 });
+      buyerChallenges.set(whatsapp, { otp, name: input.name?.trim(), referralCode, expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 });
       try {
         await sendFonnteMessage(whatsapp, `Kode OTP PASARKU: ${otp}. Berlaku 5 menit. Jangan bagikan kode ini.`);
       } catch (error) {
@@ -285,7 +289,7 @@ export const appRouter = router({
     verifyBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, otp: z.string().regex(/^\d{6}$/), challengeToken: z.string().min(20).optional() })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
       const token = readOtpChallengeToken(input.challengeToken);
-      const challenge = buyerChallenges.get(whatsapp) ?? { otp: "", name: undefined, expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 };
+      const challenge = buyerChallenges.get(whatsapp) ?? { otp: "", name: undefined, referralCode: undefined, expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 };
       if (input.challengeToken && (!token || token.scope !== "buyer" || token.whatsapp !== whatsapp || !token.otpHash)) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP belum benar atau sudah kedaluwarsa. Minta OTP baru." });
       if (!input.challengeToken && (!buyerChallenges.has(whatsapp) || challenge.expiresAt < Date.now())) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP belum benar atau sudah kedaluwarsa. Minta OTP baru." });
       const submittedHash = createHmac("sha256", process.env.JWT_SECRET?.trim() || "pasarku-otp-development-secret").update(input.otp).digest("hex");
@@ -297,7 +301,7 @@ export const appRouter = router({
         const displayName = existing?.name || challenge.name || `Warga ${whatsapp.slice(-4)}`;
         if (!existing) {
           const db = await dbRequired();
-          await db.insert(buyerProfiles).values({ name: displayName, whatsapp, village: "Sawahan", address: "", verificationStatus: "verified", isBanned: 0 });
+          await db.insert(buyerProfiles).values({ name: displayName, whatsapp, village: "Sawahan", address: "", referredByCode: challenge.referralCode || null, verificationStatus: "verified", isBanned: 0 });
         }
         await upsertAccountRole(whatsapp, "buyer", displayName);
         // Consume the challenge only after profile and multi-role sync succeed.

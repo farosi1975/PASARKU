@@ -50,6 +50,10 @@ const ensureMySqlRuntimeColumns = async () => {
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_logs (id int auto_increment primary key, slotId varchar(120) not null unique, sentAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel log promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_deliveries (id int auto_increment primary key, slotId varchar(120) not null, endpoint varchar(512) not null, sentAt timestamp not null default current_timestamp, unique key promo_notification_deliveries_slot_endpoint_idx (slotId, endpoint))`); } catch (error) { console.warn("[Database] Tabel delivery promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS whatsapp_registration_requests (id int auto_increment primary key, requestCode varchar(40) not null unique, whatsapp varchar(32) null, status varchar(20) not null default 'pending', expiresAt timestamp not null, createdAt timestamp not null default current_timestamp, updatedAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel pendaftaran WhatsApp belum dapat disiapkan:", error instanceof Error ? error.message : error); }
+  for (const column of ["referralCode varchar(24) NULL UNIQUE", "referredByCode varchar(24) NULL"]) {
+    try { await _mysqlPool.query(`ALTER TABLE buyer_profiles ADD COLUMN ${column}`); }
+    catch (error) { const code = (error as { code?: string }).code; if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom referral pembeli belum dapat disiapkan:", error instanceof Error ? error.message : error); }
+  }
 };
 
 export async function getDb(): Promise<CompatibleDatabase | null> {
@@ -65,6 +69,9 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         await _pool.query(`CREATE TABLE IF NOT EXISTS "promo_notification_logs" ("id" serial PRIMARY KEY, "slotId" varchar(120) NOT NULL UNIQUE, "sentAt" timestamp DEFAULT now() NOT NULL)`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "promo_notification_deliveries" ("id" serial PRIMARY KEY, "slotId" varchar(120) NOT NULL, "endpoint" text NOT NULL, "sentAt" timestamp DEFAULT now() NOT NULL, CONSTRAINT "promo_notification_deliveries_slot_endpoint_idx" UNIQUE ("slotId", "endpoint"))`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "whatsapp_registration_requests" ("id" serial PRIMARY KEY, "requestCode" varchar(40) NOT NULL UNIQUE, "whatsapp" varchar(32), "status" varchar(20) DEFAULT 'pending' NOT NULL, "expiresAt" timestamp NOT NULL, "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL)`);
+        await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referralCode" varchar(24)`);
+        await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referredByCode" varchar(24)`);
+        await _pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "buyer_profiles_referralCode_idx" ON "buyer_profiles" ("referralCode")`);
         _db = drizzlePostgres(_pool);
       }
       console.info(`[Database] Connected using ${databaseDialect} adapter.`);
@@ -272,9 +279,25 @@ export async function deleteSupportTicket(id: number, admin: { name: string; wha
   return { success: true as const, id };
 }
 
+const referralCodeForId = (id: number) => `PK${id.toString(36).toUpperCase().padStart(5, "0")}`;
+
 export async function getBuyerProfile(whatsapp: string) {
   const db = await getDb(); if (!db) return null;
   const rows = await db.select().from(buyerProfiles).where(eq(buyerProfiles.whatsapp, whatsapp)).limit(1);
+  const profile = rows[0];
+  if (!profile) return null;
+  let referralCode = profile.referralCode;
+  if (!referralCode) {
+    referralCode = referralCodeForId(profile.id);
+    await db.update(buyerProfiles).set({ referralCode, updatedAt: new Date() }).where(eq(buyerProfiles.id, profile.id));
+  }
+  const referredRows = await db.select({ id: buyerProfiles.id }).from(buyerProfiles).where(eq(buyerProfiles.referredByCode, referralCode));
+  return { ...profile, referralCode, referralCount: referredRows.length };
+}
+
+export async function findBuyerByReferralCode(code: string) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select({ id: buyerProfiles.id, whatsapp: buyerProfiles.whatsapp, referralCode: buyerProfiles.referralCode }).from(buyerProfiles).where(eq(buyerProfiles.referralCode, code.trim().toUpperCase())).limit(1);
   return rows[0] ?? null;
 }
 
@@ -459,7 +482,7 @@ export async function getAdminUserDirectory() {
   const productCounts = new Map<number, number>();
   for (const product of productRows) if (product.sellerId !== null) productCounts.set(product.sellerId, (productCounts.get(product.sellerId) ?? 0) + 1);
   return {
-    buyers: buyers.map((buyer) => ({ ...buyer, orderCount: orderCounts.get(buyer.whatsapp)?.count ?? 0, lastOrderCode: orderCounts.get(buyer.whatsapp)?.lastOrderCode ?? null })),
+    buyers: await Promise.all(buyers.map(async (buyer) => { const referralCode = buyer.referralCode || referralCodeForId(buyer.id); if (!buyer.referralCode) await db.update(buyerProfiles).set({ referralCode }).where(eq(buyerProfiles.id, buyer.id)); const referralCount = (await db.select({ id: buyerProfiles.id }).from(buyerProfiles).where(eq(buyerProfiles.referredByCode, referralCode))).length; return { ...buyer, referralCode, referralCount, orderCount: orderCounts.get(buyer.whatsapp)?.count ?? 0, lastOrderCode: orderCounts.get(buyer.whatsapp)?.lastOrderCode ?? null }; })),
     sellers: sellers.map((seller) => ({ ...seller, productCount: productCounts.get(seller.id) ?? 0 })),
     couriers,
     pendingBuyers: buyers.filter((buyer) => buyer.verificationStatus === "pending" || buyer.verificationStatus === "unverified"),

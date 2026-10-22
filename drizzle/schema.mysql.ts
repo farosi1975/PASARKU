@@ -63,6 +63,8 @@ export const buyerProfiles = mysqlTable("buyer_profiles", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 160 }).notNull(),
   whatsapp: varchar("whatsapp", { length: 32 }).notNull().unique(),
+  referralCode: varchar("referralCode", { length: 24 }).unique(),
+  referredByCode: varchar("referredByCode", { length: 24 }),
   avatarUrl: text("avatarUrl"),
   village: varchar("village", { length: 80 }).notNull(),
   address: text("address"),
