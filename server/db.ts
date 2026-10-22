@@ -50,10 +50,12 @@ const ensureMySqlRuntimeColumns = async () => {
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_logs (id int auto_increment primary key, slotId varchar(120) not null unique, sentAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel log promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_deliveries (id int auto_increment primary key, slotId varchar(120) not null, endpoint varchar(512) not null, sentAt timestamp not null default current_timestamp, unique key promo_notification_deliveries_slot_endpoint_idx (slotId, endpoint))`); } catch (error) { console.warn("[Database] Tabel delivery promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS whatsapp_registration_requests (id int auto_increment primary key, requestCode varchar(40) not null unique, whatsapp varchar(32) null, status varchar(20) not null default 'pending', expiresAt timestamp not null, createdAt timestamp not null default current_timestamp, updatedAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel pendaftaran WhatsApp belum dapat disiapkan:", error instanceof Error ? error.message : error); }
-  for (const column of ["referralCode varchar(24) NULL UNIQUE", "referredByCode varchar(24) NULL"]) {
+  for (const column of ["referralCode varchar(24) NULL", "referredByCode varchar(24) NULL"]) {
     try { await _mysqlPool.query(`ALTER TABLE buyer_profiles ADD COLUMN ${column}`); }
     catch (error) { const code = (error as { code?: string }).code; if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom referral pembeli belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   }
+  try { await _mysqlPool.query(`CREATE UNIQUE INDEX buyer_profiles_referralCode_idx ON buyer_profiles (referralCode)`); }
+  catch (error) { const code = (error as { code?: string }).code; if (code !== "ER_DUP_KEYNAME" && code !== "ER_DUP_ENTRY") console.warn("[Database] Indeks kode referral pembeli belum dapat disiapkan:", error instanceof Error ? error.message : error); }
 };
 
 export async function getDb(): Promise<CompatibleDatabase | null> {
