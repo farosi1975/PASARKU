@@ -87,3 +87,7 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </trpc.Provider>
 );
+
+requestAnimationFrame(() => {
+  document.getElementById("app-loading")?.remove();
+});

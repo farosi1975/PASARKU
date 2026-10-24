@@ -4,16 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <meta name="theme-color" content="#d45b39" />
+    <meta name="application-name" content="PT. PASARKU SARANA KARYA" />
     <meta name="description" content="PASARKU — marketplace lokal Kecamatan Sawahan, Nganjuk." />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="/pwa-icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/pwa-icon.svg" />
+    <link rel="icon" href="/pwa-icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/pwa-icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
     <title>PASARKU — Marketplace Lokal Sawahan</title>
+    <style>
+      #app-loading { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; align-content: center; gap: 12px; background: #2d2948; color: #fffaf5; font-family: Arial, sans-serif; text-align: center; }
+      #app-loading img { width: 144px; height: 144px; object-fit: contain; border-radius: 30px; }
+      #app-loading strong { color: #fffaf5; font-size: 30px; letter-spacing: 3px; }
+      #app-loading span { color: #ffd8a8; font-size: 13px; letter-spacing: 1.2px; }
+    </style>
   </head>
   <body>
+    <div id="app-loading" aria-label="Memuat PT. PASARKU SARANA KARYA">
+      <img src="/pwa-icon-192.png" alt="Logo PASARKU" />
+      <strong>PASARKU</strong>
+      <span>PT. PASARKU SARANA KARYA</span>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script defer src="%VITE_ANALYTICS_ENDPOINT%/umami" data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
