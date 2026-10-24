@@ -185,8 +185,12 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   }, []);
   useEffect(() => {
     const profile = buyerProfile.data;
-    if (open && profile) setForm((current) => ({ ...current, name: profile.name, whatsapp: profile.whatsapp, village: profile.village, address: profile.address || "" }));
-  }, [buyerProfile.data, open]);
+    if (!open || !profile) return;
+    setForm((current) => {
+      const next = { ...current, name: profile.name, whatsapp: profile.whatsapp, village: profile.village, address: profile.address || "" };
+      return current.name === next.name && current.whatsapp === next.whatsapp && current.village === next.village && current.address === next.address ? current : next;
+    });
+  }, [buyerProfile.data?.name, buyerProfile.data?.whatsapp, buyerProfile.data?.village, buyerProfile.data?.address, open]);
   if (!open) return null;
   const hasFreeShipping = items.length > 0 && items.every((item) => item.sellerFreeShipping === true);
   const buyerCoordinates = parseCoordinates(currentLocation);
