@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, Check, ChevronDown, Clock3, MapPin, MessageCircle, Minus, PackageCheck, Plus, RefreshCw, Search, Settings, ShoppingBag, SlidersHorizontal, Sparkles, Truck, Trash2, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
@@ -132,7 +132,7 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   const [guestReferralCode, setGuestReferralCode] = useState("");
   const [guestRequestCode, setGuestRequestCode] = useState<string | null>(null);
   const [guestRegistrationError, setGuestRegistrationError] = useState<string | null>(null);
-  const [lastGuestStatus, setLastGuestStatus] = useState<string | null>(null);
+  const lastGuestStatusRef = useRef<string | null>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [form, setForm] = useState({ name: "", whatsapp: "", village: "Sawahan", address: "", note: "" });
   const [customVillage, setCustomVillage] = useState("");
@@ -224,7 +224,7 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   const startGuestWhatsAppRegistration = async () => {
     const popup = window.open("about:blank", "_blank");
     setGuestRegistrationError(null);
-    setLastGuestStatus(null);
+    lastGuestStatusRef.current = null;
     try {
       const result = await createWhatsAppRegistration.mutateAsync({ referralCode: guestReferralCode.trim() || undefined });
       setGuestRequestCode(result.requestCode);
@@ -239,8 +239,8 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   };
   useEffect(() => {
     const status = guestRegistrationStatus.data;
-    if (!status || status.status === lastGuestStatus) return;
-    setLastGuestStatus(status.status);
+    if (!status || status.status === lastGuestStatusRef.current) return;
+    lastGuestStatusRef.current = status.status;
     if (status?.status === "rejected") {
       const message = guestReferralCode.trim() ? "Kode referral tidak valid, sudah tidak aktif, atau tidak boleh digunakan sendiri." : "Pesan WhatsApp ditolak. Pastikan pesan berisi kode sesi yang dibuat PASARKU.";
       setGuestRegistrationError(message);
@@ -262,7 +262,7 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
       setGuestRegistrationOpen(false); setGuestRequestCode(null); setGuestRegistrationError(null);
       toast.success("Pendaftaran berhasil", { description: "Anda sudah masuk. Tekan Buat pesanan untuk melanjutkan." });
     }
-  }, [guestRegistrationStatus.data, form.name, guestReferralCode, lastGuestStatus]);
+  }, [guestRegistrationStatus.data, form.name, guestReferralCode]);
   const useCurrentLocation = () => {
     if (!navigator.geolocation) return toast.error("Perangkat ini tidak mendukung lokasi terkini.");
     setLocating(true);
