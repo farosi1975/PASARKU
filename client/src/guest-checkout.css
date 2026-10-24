@@ -1,0 +1,10 @@
+.guest-registration-card{margin-top:22px;padding:20px;border:1px solid #f3c9b5;border-radius:18px;background:linear-gradient(145deg,#fff5eb,#fffdf9);box-shadow:0 10px 28px rgba(145,72,35,.1)}
+.guest-registration-icon{width:46px;height:46px;display:grid;place-items:center;margin-bottom:12px;border-radius:14px;color:#fff;background:linear-gradient(135deg,#ff6a00,#e94e2e)}
+.guest-registration-card h3{margin:7px 0 8px;font-family:"Space Grotesk",sans-serif;font-size:24px;line-height:1.05;letter-spacing:-.05em}
+.guest-registration-card p{margin:0 0 16px;color:#806f66;font-size:11px;line-height:1.65}
+.guest-registration-card label{display:grid;gap:7px;color:#5c514b;font-size:10px;font-weight:800}
+.guest-registration-card input{width:100%;padding:12px 13px;border:1px solid #eadbd2;border-radius:10px;outline:0;background:#fff;font-size:11px}
+.guest-registration-card input:focus{border-color:#edb19d;box-shadow:0 0 0 3px #fff0e8}
+.guest-registration-wait{display:flex;align-items:center;gap:7px;padding:10px 12px;border-radius:10px;color:#3f805d;background:#eef8f0;font-size:10px;font-weight:700}
+.guest-registration-card .resend-button{width:100%;margin-top:8px}
+@media(max-width:560px){.guest-registration-card{padding:16px}.guest-registration-card h3{font-size:21px}}

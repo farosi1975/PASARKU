@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, Check, ChevronDown, Clock3, MapPin, Minus, PackageCheck, Plus, Search, Settings, ShoppingBag, SlidersHorizontal, Sparkles, Truck, Trash2, UserRound, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Clock3, MapPin, MessageCircle, Minus, PackageCheck, Plus, RefreshCw, Search, Settings, ShoppingBag, SlidersHorizontal, Sparkles, Truck, Trash2, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { categories, formatRupiah, type Product } from "@/data/catalog";
 import { useCart } from "@/contexts/CartContext";
@@ -128,12 +128,18 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
   const { items, subtotal, clearCart } = useCart();
   const createOrder = trpc.marketplace.createOrder.useMutation();
   const [buyerPhone, setBuyerPhone] = useState("");
+  const [guestRegistrationOpen, setGuestRegistrationOpen] = useState(false);
+  const [guestReferralCode, setGuestReferralCode] = useState("");
+  const [guestRequestCode, setGuestRequestCode] = useState<string | null>(null);
+  const [isSignedIn, setIsSignedIn] = useState(false);
   const [form, setForm] = useState({ name: "", whatsapp: "", village: "Sawahan", address: "", note: "" });
   const [customVillage, setCustomVillage] = useState("");
   const [currentLocation, setCurrentLocation] = useState("");
   const [locating, setLocating] = useState(false);
   const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
   const buyerProfile = trpc.marketplace.buyerProfile.useQuery({ whatsapp: buyerPhone || "0000000000" }, { enabled: buyerPhone.length >= 10 });
+  const createWhatsAppRegistration = trpc.marketplace.createWhatsAppRegistration.useMutation();
+  const guestRegistrationStatus = trpc.marketplace.whatsappRegistrationStatus.useQuery({ requestCode: guestRequestCode || "00000000" }, { enabled: Boolean(guestRequestCode), refetchInterval: guestRequestCode ? 3000 : false });
   const shippingSettings = trpc.marketplace.shippingSettings.useQuery();
   const shipping = shippingSettings.data || DEFAULT_SHIPPING_SETTINGS;
   // Backend hanya memakai lokasi pickup bila seluruh item berasal dari satu titik toko.
@@ -161,6 +167,7 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
     const loadBuyer = () => {
       try {
         const session = JSON.parse(window.localStorage.getItem(USER_SESSION_KEY) || "null") as { name?: string; phone?: string } | null;
+        setIsSignedIn(Boolean(session?.phone));
         const phone = session?.phone || "";
         setBuyerPhone(phone);
         if (session) setForm((current) => ({ ...current, name: current.name || session.name || "", whatsapp: current.whatsapp || phone }));
@@ -169,8 +176,10 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
       }
     };
     loadBuyer();
+    const onFocus = () => loadBuyer();
     window.addEventListener(AUTH_EVENT, loadBuyer);
-    return () => window.removeEventListener(AUTH_EVENT, loadBuyer);
+    window.addEventListener("focus", onFocus);
+    return () => { window.removeEventListener(AUTH_EVENT, loadBuyer); window.removeEventListener("focus", onFocus); };
   }, []);
   useEffect(() => {
     const profile = buyerProfile.data;
@@ -191,6 +200,7 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
     event.preventDefault();
     if (unavailableItems.length) return toast.error("Ada produk yang stoknya habis", { description: "Hapus item tersebut dari keranjang sebelum checkout." });
     if (!form.name || !form.whatsapp || !form.address) return toast.error("Lengkapi nama, WhatsApp, dan alamat terlebih dahulu.");
+    if (!isSignedIn) { setGuestRegistrationOpen(true); return; }
     const village = form.village === LOCATION_OTHER ? customVillage.trim() : form.village;
     if (village.length < 2) return toast.error("Tuliskan nama kecamatan atau wilayah tujuan.");
     const localOrderId = makeOrderId();
@@ -209,12 +219,37 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
     window.setTimeout(() => navigate(`/pesanan/${orderId}`), 300);
   };
   const setField = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const startGuestWhatsAppRegistration = async () => {
+    const popup = window.open("about:blank", "_blank");
+    try {
+      const result = await createWhatsAppRegistration.mutateAsync({ referralCode: guestReferralCode.trim() || undefined });
+      setGuestRequestCode(result.requestCode);
+      const target = "6281456015901";
+      const message = encodeURIComponent(`DAFTAR PASARKU ${result.requestCode}`);
+      const appUrl = `whatsapp://send?phone=${target}&text=${message}`;
+      const webUrl = `https://wa.me/${target}?text=${message}`;
+      if (popup) { popup.location.href = appUrl; window.setTimeout(() => { if (!popup.closed) popup.location.href = webUrl; }, 1800); }
+      else { window.location.href = appUrl; }
+      toast.success("WhatsApp dibuka", { description: "Tekan Kirim. Setelah pesan diterima, Anda otomatis kembali ke checkout." });
+    } catch (error) { popup?.close(); toast.error("Pendaftaran WhatsApp belum siap", { description: error instanceof Error ? error.message : "Coba lagi beberapa saat." }); }
+  };
+  useEffect(() => {
+    const status = guestRegistrationStatus.data;
+    if (status?.status === "verified" && status.whatsapp) {
+      const session = { name: form.name || `Warga ${status.whatsapp.slice(-4)}`, phone: status.whatsapp, mode: "registerWhatsApp", signedInAt: new Date().toISOString() };
+      window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
+      window.dispatchEvent(new Event(AUTH_EVENT));
+      setIsSignedIn(true); setBuyerPhone(status.whatsapp); setForm((current) => ({ ...current, whatsapp: status.whatsapp || current.whatsapp }));
+      setGuestRegistrationOpen(false); setGuestRequestCode(null);
+      toast.success("Pendaftaran berhasil", { description: "Anda sudah masuk. Tekan Buat pesanan untuk melanjutkan." });
+    }
+  }, [guestRegistrationStatus.data, form.name]);
   const useCurrentLocation = () => {
     if (!navigator.geolocation) return toast.error("Perangkat ini tidak mendukung lokasi terkini.");
     setLocating(true);
     navigator.geolocation.getCurrentPosition((position) => { const value = `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`; setCurrentLocation(value); setLocating(false); toast.success("Lokasi terkini berhasil ditambahkan", { description: "Kurir akan melihat titik lokasi ini bersama alamat terdaftar." }); }, () => { setLocating(false); toast.error("Lokasi belum dapat diakses", { description: "Izinkan akses lokasi di browser atau gunakan alamat terdaftar." }); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
   };
-  return <div className="checkout-backdrop"><div className="checkout-modal"><div className="drawer-heading"><div><span className="eyebrow">Langkah terakhir</span><h2>Checkout COD</h2></div><button className="close-button" onClick={onClose}><X size={20} /></button></div><form onSubmit={submit} className="checkout-form"><div className="profile-sync-note"><UserRound size={15} /> {buyerProfile.data ? "Data profil tersimpan otomatis." : "Lengkapi data ini agar Admin dapat menghubungi Anda."}</div><div className="form-grid"><label>Nama penerima<input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Contoh: Sari Wulandari" /></label><label>No. WhatsApp<input value={form.whatsapp} onChange={(e) => setField("whatsapp", e.target.value)} placeholder="08xxxxxxxxxx" /></label></div><label>Desa / wilayah<select value={form.village} onChange={(e) => setField("village", e.target.value)}>{SAWAHAN_LOCATION_OPTIONS.map((village) => <option key={village}>{village}</option>)}</select>{form.village === LOCATION_OTHER && <input value={customVillage} onChange={(event) => setCustomVillage(event.target.value)} placeholder="Tulis kecamatan/wilayah sendiri" maxLength={80} />}</label><label>Alamat lengkap<input value={form.address} onChange={(e) => setField("address", e.target.value)} placeholder="Dusun, RT/RW, patokan rumah" /></label><div className="current-location-box"><div><strong>Lokasi pengantaran</strong><small>{currentLocation ? `Lokasi terkini tersimpan: ${currentLocation}` : "Gunakan lokasi terkini bila Anda sedang di luar alamat terdaftar."}</small></div><button className="outline-button" type="button" onClick={useCurrentLocation} disabled={locating}><MapPin size={15} /> {locating ? "Mencari..." : currentLocation ? "Perbarui lokasi" : "Gunakan lokasi terkini"}</button></div><label>Catatan untuk kurir <span className="optional">opsional</span><textarea value={form.note} onChange={(e) => setField("note", e.target.value)} placeholder="Contoh: titip di warung depan rumah" rows={3} /></label><div className="payment-choice"><div className="payment-icon">▣</div><div><strong>Bayar di tempat (COD)</strong><span>Kurir membawa nota digital dan menagih saat barang sampai.</span></div><Check size={18} /></div><div className="checkout-shipping-summary"><div><span>{routeDistanceKm ? "Jarak rute Google Maps" : currentLocation ? "Jarak estimasi" : "Jarak minimum"}</span><strong>{distanceKm.toFixed(1)} km</strong></div><div><span>Ongkir {hasFreeShipping ? "(gratis dari toko)" : shipping.discountPercent ? `(diskon ${shipping.discountPercent}%)` : ""}</span><strong>{hasFreeShipping ? "Gratis" : formatRupiah(delivery)}</strong></div><div><span>Biaya penanganan {shipping.handlingFeePercent ? `(${shipping.handlingFeePercent}%)` : ""}</span><strong>{formatRupiah(handlingFee)}</strong></div></div><div className="checkout-total"><span>Total yang dibayar</span><strong>{formatRupiah(total)}</strong></div><button className="primary-button full-width" type="submit" disabled={unavailableItems.length > 0}>Buat pesanan <ArrowRight size={17} /></button><p className="fine-print">Setelah dibuat, Admin PASARKU dapat dihubungi via WhatsApp untuk konfirmasi.</p></form></div></div>;
+  return <div className="checkout-backdrop"><div className="checkout-modal"><div className="drawer-heading"><div><span className="eyebrow">Langkah terakhir</span><h2>Checkout COD</h2></div><button className="close-button" onClick={onClose}><X size={20} /></button></div>{guestRegistrationOpen && !isSignedIn && <div className="guest-registration-card"><div className="guest-registration-icon"><MessageCircle size={22} /></div><span className="eyebrow">Satu langkah lagi</span><h3>Daftar lewat WhatsApp untuk membuat pesanan</h3><p>Anda sudah bisa melihat katalog tanpa daftar. Kirim satu pesan WhatsApp, lalu kembali ke halaman ini untuk menyelesaikan checkout.</p><label>Kode referral <span className="optional">opsional</span><input value={guestReferralCode} onChange={(event) => setGuestReferralCode(event.target.value.toUpperCase())} placeholder="Contoh: PK00001" maxLength={24} /></label>{guestRequestCode && guestRegistrationStatus.data?.status === "pending" && <div className="guest-registration-wait"><RefreshCw size={15} /> Menunggu pesan WhatsApp…</div>}<button className="primary-button full-width" type="button" onClick={startGuestWhatsAppRegistration} disabled={createWhatsAppRegistration.isPending}>{createWhatsAppRegistration.isPending ? "Menyiapkan WhatsApp..." : guestRequestCode ? "Buka WhatsApp lagi" : "Daftar lewat WhatsApp"} <MessageCircle size={17} /></button><button className="resend-button" type="button" onClick={() => setGuestRegistrationOpen(false)}>Kembali ke checkout</button></div>}<form onSubmit={submit} className="checkout-form"><div className="profile-sync-note"><UserRound size={15} /> {buyerProfile.data ? "Data profil tersimpan otomatis." : "Lengkapi data ini agar Admin dapat menghubungi Anda."}</div><div className="form-grid"><label>Nama penerima<input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Contoh: Sari Wulandari" /></label><label>No. WhatsApp<input value={form.whatsapp} onChange={(e) => setField("whatsapp", e.target.value)} placeholder="08xxxxxxxxxx" /></label></div><label>Desa / wilayah<select value={form.village} onChange={(e) => setField("village", e.target.value)}>{SAWAHAN_LOCATION_OPTIONS.map((village) => <option key={village}>{village}</option>)}</select>{form.village === LOCATION_OTHER && <input value={customVillage} onChange={(event) => setCustomVillage(event.target.value)} placeholder="Tulis kecamatan/wilayah sendiri" maxLength={80} />}</label><label>Alamat lengkap<input value={form.address} onChange={(e) => setField("address", e.target.value)} placeholder="Dusun, RT/RW, patokan rumah" /></label><div className="current-location-box"><div><strong>Lokasi pengantaran</strong><small>{currentLocation ? `Lokasi terkini tersimpan: ${currentLocation}` : "Gunakan lokasi terkini bila Anda sedang di luar alamat terdaftar."}</small></div><button className="outline-button" type="button" onClick={useCurrentLocation} disabled={locating}><MapPin size={15} /> {locating ? "Mencari..." : currentLocation ? "Perbarui lokasi" : "Gunakan lokasi terkini"}</button></div><label>Catatan untuk kurir <span className="optional">opsional</span><textarea value={form.note} onChange={(e) => setField("note", e.target.value)} placeholder="Contoh: titip di warung depan rumah" rows={3} /></label><div className="payment-choice"><div className="payment-icon">▣</div><div><strong>Bayar di tempat (COD)</strong><span>Kurir membawa nota digital dan menagih saat barang sampai.</span></div><Check size={18} /></div><div className="checkout-shipping-summary"><div><span>{routeDistanceKm ? "Jarak rute Google Maps" : currentLocation ? "Jarak estimasi" : "Jarak minimum"}</span><strong>{distanceKm.toFixed(1)} km</strong></div><div><span>Ongkir {hasFreeShipping ? "(gratis dari toko)" : shipping.discountPercent ? `(diskon ${shipping.discountPercent}%)` : ""}</span><strong>{hasFreeShipping ? "Gratis" : formatRupiah(delivery)}</strong></div><div><span>Biaya penanganan {shipping.handlingFeePercent ? `(${shipping.handlingFeePercent}%)` : ""}</span><strong>{formatRupiah(handlingFee)}</strong></div></div><div className="checkout-total"><span>Total yang dibayar</span><strong>{formatRupiah(total)}</strong></div><button className="primary-button full-width" type="submit" disabled={unavailableItems.length > 0}>Buat pesanan <ArrowRight size={17} /></button><p className="fine-print">Setelah dibuat, Admin PASARKU dapat dihubungi via WhatsApp untuk konfirmasi.</p></form></div></div>;
 }
 
 export default function Home() {

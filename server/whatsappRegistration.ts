@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { and, eq, gt } from "drizzle-orm";
-import { getDb, upsertAccountRole } from "./db";
+import { findBuyerByReferralCode, getDb, upsertAccountRole } from "./db";
 import { buyerProfiles, whatsappRegistrationRequests } from "./db-tables";
 
 const REQUEST_TTL_MS = 10 * 60 * 1000;
@@ -11,8 +11,12 @@ const normalizePhone = (value: string) => {
 
 const makeRequestCode = () => randomBytes(6).toString("hex").toUpperCase();
 const cleanMessage = (value: unknown) => String(value ?? "").trim().replace(/\s+/g, " ");
+export const parseWhatsAppRegistrationMessage = (value: unknown) => {
+  const match = cleanMessage(value).match(/^DAFTAR PASARKU\s+([A-Z0-9]{8,20})$/i);
+  return match?.[1]?.toUpperCase() ?? null;
+};
 
-export async function createWhatsAppRegistrationRequest() {
+export async function createWhatsAppRegistrationRequest(referralCode?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database belum tersedia.");
   let requestCode = makeRequestCode();
@@ -23,6 +27,7 @@ export async function createWhatsAppRegistrationRequest() {
   }
   await db.insert(whatsappRegistrationRequests).values({
     requestCode,
+    referralCode: referralCode?.trim().toUpperCase() || null,
     status: "pending",
     expiresAt: new Date(Date.now() + REQUEST_TTL_MS),
   });
@@ -41,9 +46,8 @@ export async function getWhatsAppRegistrationStatus(requestCode: string) {
 
 export async function processFonnteIncomingRegistration(payload: { sender?: unknown; message?: unknown }) {
   const message = cleanMessage(payload.message);
-  const match = message.match(/^DAFTAR PASARKU\s+([A-Z0-9]{8,20})$/i);
-  if (!match) return { handled: false as const, reason: "ignored_message" as const };
-  const requestCode = match[1].toUpperCase();
+  const requestCode = parseWhatsAppRegistrationMessage(message);
+  if (!requestCode) return { handled: false as const, reason: "ignored_message" as const };
   const whatsapp = normalizePhone(String(payload.sender ?? ""));
   if (whatsapp.length < 10) return { handled: false as const, reason: "invalid_sender" as const };
 
@@ -60,7 +64,15 @@ export async function processFonnteIncomingRegistration(payload: { sender?: unkn
   }
 
   const displayName = existing[0]?.name || `Warga ${whatsapp.slice(-4)}`;
-  await db.insert(buyerProfiles).values({ name: displayName, whatsapp, village: "Sawahan", address: "", verificationStatus: "verified", isBanned: 0 }).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { verificationStatus: "verified", isBanned: 0, updatedAt: new Date() } });
+  const referralCode = request.referralCode?.trim().toUpperCase() || undefined;
+  if (referralCode) {
+    const referrer = await findBuyerByReferralCode(referralCode);
+    if (!referrer || referrer.whatsapp === whatsapp) {
+      await db.update(whatsappRegistrationRequests).set({ whatsapp, status: "rejected", updatedAt: new Date() }).where(eq(whatsappRegistrationRequests.id, request.id));
+      return { handled: true as const, status: "rejected" as const, whatsapp };
+    }
+  }
+  await db.insert(buyerProfiles).values({ name: displayName, whatsapp, village: "Sawahan", address: "", referredByCode: referralCode || null, verificationStatus: "verified", isBanned: 0 }).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { verificationStatus: "verified", isBanned: 0, referredByCode: referralCode || existing[0]?.referredByCode || null, updatedAt: new Date() } });
   await upsertAccountRole(whatsapp, "buyer", displayName);
   await db.update(whatsappRegistrationRequests).set({ whatsapp, status: "verified", updatedAt: new Date() }).where(eq(whatsappRegistrationRequests.id, request.id));
   return { handled: true as const, status: "verified" as const, whatsapp, name: displayName };

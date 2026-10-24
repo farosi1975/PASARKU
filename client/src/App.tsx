@@ -18,6 +18,7 @@ import BuyerProfile from "./pages/BuyerProfile";
 import PwaInstallPrompt from "./components/PwaInstallPrompt";
 import PushPromoPrompt from "./components/PushPromoPrompt";
 import "./push-promo.css";
+import "./guest-checkout.css";
 import { trpc } from "./lib/trpc";
 
 function VisitorTracker() {

@@ -78,6 +78,7 @@ export const whatsappRegistrationRequests = mysqlTable("whatsapp_registration_re
   id: int("id").autoincrement().primaryKey(),
   requestCode: varchar("requestCode", { length: 40 }).notNull().unique(),
   whatsapp: varchar("whatsapp", { length: 32 }),
+  referralCode: varchar("referralCode", { length: 24 }),
   status: varchar("status", { length: 20 }).default("pending").notNull(),
   expiresAt: timestamp("expiresAt").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

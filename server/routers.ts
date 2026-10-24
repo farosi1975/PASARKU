@@ -268,7 +268,7 @@ export const appRouter = router({
       if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Pendaftaran pembeli belum ditemukan." });
       return { name: profile.name, whatsapp: profile.whatsapp, status: profile.verificationStatus };
     }),
-    createWhatsAppRegistration: publicProcedure.mutation(() => createWhatsAppRegistrationRequest()),
+    createWhatsAppRegistration: publicProcedure.input(z.object({ referralCode: z.string().trim().min(4).max(24).optional() }).optional()).mutation(({ input }) => createWhatsAppRegistrationRequest(input?.referralCode?.toUpperCase())),
     whatsappRegistrationStatus: publicProcedure.input(z.object({ requestCode: z.string().regex(/^[A-Z0-9]{8,20}$/) })).query(({ input }) => getWhatsAppRegistrationStatus(input.requestCode)),
     requestBuyerOtp: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2).optional(), referralCode: z.string().trim().min(4).max(24).optional() })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
