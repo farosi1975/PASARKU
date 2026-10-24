@@ -191,6 +191,32 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
       return current.name === next.name && current.whatsapp === next.whatsapp && current.village === next.village && current.address === next.address ? current : next;
     });
   }, [buyerProfile.data?.name, buyerProfile.data?.whatsapp, buyerProfile.data?.village, buyerProfile.data?.address, open]);
+  useEffect(() => {
+    const status = guestRegistrationStatus.data;
+    if (!status || status.status === lastGuestStatusRef.current) return;
+    lastGuestStatusRef.current = status.status;
+    if (status?.status === "rejected") {
+      const message = guestReferralCode.trim() ? "Kode referral tidak valid, sudah tidak aktif, atau tidak boleh digunakan sendiri." : "Pesan WhatsApp ditolak. Pastikan pesan berisi kode sesi yang dibuat PASARKU.";
+      setGuestRegistrationError(message);
+      toast.error("Pendaftaran belum berhasil", { description: message });
+    } else if (status?.status === "expired") {
+      const message = "Waktu pendaftaran sudah habis. Buat sesi WhatsApp baru lalu kirim pesannya kembali.";
+      setGuestRegistrationError(message);
+      toast.error("Sesi WhatsApp kedaluwarsa", { description: message });
+    } else if (status?.status === "not_found") {
+      const message = "Kode sesi tidak ditemukan. Silakan buat sesi WhatsApp baru.";
+      setGuestRegistrationError(message);
+      toast.error("Sesi WhatsApp tidak ditemukan", { description: message });
+    }
+    if (status?.status === "verified" && status.whatsapp) {
+      const session = { name: form.name || `Warga ${status.whatsapp.slice(-4)}`, phone: status.whatsapp, mode: "registerWhatsApp", signedInAt: new Date().toISOString() };
+      window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
+      window.dispatchEvent(new Event(AUTH_EVENT));
+      setIsSignedIn(true); setBuyerPhone(status.whatsapp); setForm((current) => ({ ...current, whatsapp: status.whatsapp || current.whatsapp }));
+      setGuestRegistrationOpen(false); setGuestRequestCode(null); setGuestRegistrationError(null);
+      toast.success("Pendaftaran berhasil", { description: "Anda sudah masuk. Tekan Buat pesanan untuk melanjutkan." });
+    }
+  }, [guestRegistrationStatus.data, form.name, guestReferralCode]);
   if (!open) return null;
   const hasFreeShipping = items.length > 0 && items.every((item) => item.sellerFreeShipping === true);
   const buyerCoordinates = parseCoordinates(currentLocation);
@@ -241,32 +267,6 @@ function CheckoutModal({ open, onClose, onDone }: { open: boolean; onClose: () =
       toast.success("WhatsApp dibuka", { description: "Tekan Kirim. Setelah pesan diterima, Anda otomatis kembali ke checkout." });
     } catch (error) { popup?.close(); const message = error instanceof Error ? error.message : "Coba lagi beberapa saat."; setGuestRegistrationError(message); toast.error("Pendaftaran WhatsApp belum siap", { description: message }); }
   };
-  useEffect(() => {
-    const status = guestRegistrationStatus.data;
-    if (!status || status.status === lastGuestStatusRef.current) return;
-    lastGuestStatusRef.current = status.status;
-    if (status?.status === "rejected") {
-      const message = guestReferralCode.trim() ? "Kode referral tidak valid, sudah tidak aktif, atau tidak boleh digunakan sendiri." : "Pesan WhatsApp ditolak. Pastikan pesan berisi kode sesi yang dibuat PASARKU.";
-      setGuestRegistrationError(message);
-      toast.error("Pendaftaran belum berhasil", { description: message });
-    } else if (status?.status === "expired") {
-      const message = "Waktu pendaftaran sudah habis. Buat sesi WhatsApp baru lalu kirim pesannya kembali.";
-      setGuestRegistrationError(message);
-      toast.error("Sesi WhatsApp kedaluwarsa", { description: message });
-    } else if (status?.status === "not_found") {
-      const message = "Kode sesi tidak ditemukan. Silakan buat sesi WhatsApp baru.";
-      setGuestRegistrationError(message);
-      toast.error("Sesi WhatsApp tidak ditemukan", { description: message });
-    }
-    if (status?.status === "verified" && status.whatsapp) {
-      const session = { name: form.name || `Warga ${status.whatsapp.slice(-4)}`, phone: status.whatsapp, mode: "registerWhatsApp", signedInAt: new Date().toISOString() };
-      window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
-      window.dispatchEvent(new Event(AUTH_EVENT));
-      setIsSignedIn(true); setBuyerPhone(status.whatsapp); setForm((current) => ({ ...current, whatsapp: status.whatsapp || current.whatsapp }));
-      setGuestRegistrationOpen(false); setGuestRequestCode(null); setGuestRegistrationError(null);
-      toast.success("Pendaftaran berhasil", { description: "Anda sudah masuk. Tekan Buat pesanan untuk melanjutkan." });
-    }
-  }, [guestRegistrationStatus.data, form.name, guestReferralCode]);
   const useCurrentLocation = () => {
     if (!navigator.geolocation) return toast.error("Perangkat ini tidak mendukung lokasi terkini.");
     setLocating(true);
