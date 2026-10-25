@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { createSupportTicket, findBuyerByReferralCode, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminProfile, deleteOrder, deleteSupportTicket, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole, savePushSubscription, removePushSubscription } from "./db";
+import { createSupportTicket, findBuyerByReferralCode, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminProfile, deleteOrder, deleteSupportTicket, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole, savePushSubscription, removePushSubscription, isPermanentAdminWhatsapp } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "./db-tables";
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -55,6 +55,9 @@ const buyerChallenges = new Map<string, { otp: string; name?: string; referralCo
 const sellerChallenges = new Map<string, { otp: string; shopName: string; ownerName: string; village: string; expiresAt: number; attempts: number }>();
 const courierChallenges = new Map<string, { otp: string; name: string; vehicle: string; expiresAt: number; attempts: number }>();
 const normalizePhone = (value: string) => { const digits = value.replace(/\D/g, ""); return digits.startsWith("0") ? `62${digits.slice(1)}` : digits; };
+const requirePermanentAdmin = (admin: { whatsapp: string }) => {
+  if (!isPermanentAdminWhatsapp(admin.whatsapp)) throw new TRPCError({ code: "FORBIDDEN", message: "Hanya Admin Permanen yang boleh menghapus admin lain." });
+};
 const otpKey = (scope: string, whatsapp: string) => `${scope}:${whatsapp}`;
 const otpSignature = (payload: string) => createHmac("sha256", process.env.JWT_SECRET?.trim() || "pasarku-otp-development-secret").update(payload).digest("base64url");
 const createOtpChallengeToken = (scope: "buyer" | "admin", whatsapp: string, otp: string) => {
@@ -351,6 +354,7 @@ export const appRouter = router({
       await requireAdminSession(input.sessionToken);
       const db = await dbRequired();
       const whatsapp = normalizePhone(input.whatsapp);
+      if (isPermanentAdminWhatsapp(whatsapp)) throw new TRPCError({ code: "CONFLICT", message: "Admin permanen hanya dapat ditambahkan melalui kode program." });
       const name = input.name.trim();
       await db.insert(adminProfiles).values({ name, whatsapp, verifiedAt: new Date() }).onConflictDoUpdate({ target: adminProfiles.whatsapp, set: { name, verifiedAt: new Date() } });
       await upsertAccountRole(whatsapp, "admin", name);
@@ -361,6 +365,7 @@ export const appRouter = router({
       catch (error) { throw new TRPCError({ code: /sudah terdaftar/i.test(error instanceof Error ? error.message : "") ? "CONFLICT" : "BAD_REQUEST", message: error instanceof Error ? error.message : "Admin belum dapat diperbarui." }); }
     }),    deleteAdmin: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive() })).mutation(async ({ input }) => {
       const admin = await requireAdminSession(input.sessionToken);
+      requirePermanentAdmin(admin);
       try { return await deleteAdminProfile(input.id, { name: admin.name, whatsapp: admin.whatsapp }); }
       catch (error) { throw new TRPCError({ code: /terakhir|dirinya sendiri|permanen/i.test(error instanceof Error ? error.message : "") ? "CONFLICT" : "BAD_REQUEST", message: error instanceof Error ? error.message : "Admin belum dapat dihapus." }); }
     }),

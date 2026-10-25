@@ -312,6 +312,12 @@ export async function listBuyerProfiles() {
   return db.select().from(buyerProfiles).orderBy(desc(buyerProfiles.updatedAt));
 }
 
+export const PERMANENT_ADMIN_WHATSAPP = "6282330503206";
+export const isPermanentAdminWhatsapp = (whatsapp: string) => {
+  const digits = whatsapp.replace(/\D/g, "");
+  return digits === "082330503206" || digits === PERMANENT_ADMIN_WHATSAPP;
+};
+
 export async function getAdminProfile(whatsapp: string) {
   const db = await getDb(); if (!db) return null;
   const rows = await db.select().from(adminProfiles).where(eq(adminProfiles.whatsapp, whatsapp)).limit(1);
@@ -328,6 +334,7 @@ export async function updateAdminProfile(id: number, name: string, whatsapp: str
   await db.transaction(async (tx) => {
     const currentRows = await tx.select().from(adminProfiles).where(eq(adminProfiles.id, id)).limit(1);
     if (!currentRows[0]) throw new Error("Admin tidak ditemukan.");
+    if (isPermanentAdminWhatsapp(currentRows[0].whatsapp) || isPermanentAdminWhatsapp(whatsapp)) throw new Error("Admin permanen hanya dapat diubah melalui kode program.");
     const conflict = await tx.select().from(adminProfiles).where(eq(adminProfiles.whatsapp, whatsapp)).limit(1);
     if (conflict[0] && conflict[0].id !== id) throw new Error("Nomor WhatsApp sudah terdaftar sebagai admin lain.");
     const oldWhatsapp = currentRows[0].whatsapp;
@@ -352,7 +359,7 @@ export async function deleteAdminProfile(id: number, admin: { name: string; what
     const targetRows = await tx.select().from(adminProfiles).where(eq(adminProfiles.id, id)).limit(1);
     const target = targetRows[0];
     if (!target) throw new Error("Admin tidak ditemukan.");
-    if (target.whatsapp === "082330503206") throw new Error("Admin permanen tidak dapat dihapus.");
+    if (isPermanentAdminWhatsapp(target.whatsapp)) throw new Error("Admin permanen hanya dapat dihapus melalui kode program.");
     if (target.whatsapp === admin.whatsapp) throw new Error("Admin yang sedang digunakan tidak dapat menghapus dirinya sendiri.");
     await tx.delete(adminProfiles).where(eq(adminProfiles.id, id));
     const accountRows = await tx.select().from(userAccounts).where(eq(userAccounts.whatsapp, target.whatsapp)).limit(1);
