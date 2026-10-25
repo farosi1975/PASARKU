@@ -8,6 +8,8 @@ import App from "./App";
 import { startLogin } from "./const";
 import "./index.css";
 
+const appLoadingStartedAt = Date.now();
+
 if ("serviceWorker" in navigator && (window.location.protocol === "https:" || window.location.hostname === "localhost")) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js", { updateViaCache: "none" }).catch(error => {
@@ -89,5 +91,12 @@ createRoot(document.getElementById("root")!).render(
 );
 
 requestAnimationFrame(() => {
-  document.getElementById("app-loading")?.remove();
+  const minimumVisibleMs = 1200;
+  const elapsed = Date.now() - appLoadingStartedAt;
+  window.setTimeout(() => {
+    const loading = document.getElementById("app-loading");
+    if (!loading) return;
+    loading.classList.add("is-hidden");
+    window.setTimeout(() => loading.remove(), 200);
+  }, Math.max(0, minimumVisibleMs - elapsed));
 });

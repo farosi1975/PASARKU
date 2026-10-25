@@ -14,10 +14,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
     <title>PASARKU — Marketplace Lokal Sawahan</title>
     <style>
-      #app-loading { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; align-content: center; gap: 12px; background: #2d2948; color: #fffaf5; font-family: Arial, sans-serif; text-align: center; }
-      #app-loading img { width: 144px; height: 144px; object-fit: contain; border-radius: 30px; }
-      #app-loading strong { color: #fffaf5; font-size: 30px; letter-spacing: 3px; }
-      #app-loading span { color: #ffd8a8; font-size: 13px; letter-spacing: 1.2px; }
+      #app-loading { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; align-content: center; gap: 12px; padding: 24px; background: #2d2948; color: #fffaf5; font-family: Arial, sans-serif; text-align: center; opacity: 1; transition: opacity 180ms ease-out; }
+      #app-loading.is-hidden { opacity: 0; pointer-events: none; }
+      #app-loading img { width: min(144px, 36vw); height: min(144px, 36vw); object-fit: contain; border-radius: 30px; }
+      #app-loading strong { color: #fffaf5; font-size: clamp(26px, 8vw, 30px); letter-spacing: 3px; }
+      #app-loading span { display: block; width: min(100%, 360px); color: #ffd8a8; font-size: clamp(11px, 3.5vw, 15px); line-height: 1.4; letter-spacing: .8px; }
     </style>
   </head>
   <body>
