@@ -256,6 +256,26 @@ export const orderItems = pgTable("order_items", {
   quantity: integer("quantity").notNull(),
 });
 
+export const taxCashEntries = pgTable("tax_cash_entries", {
+  id: serial("id").primaryKey(),
+  entryDate: varchar("entryDate", { length: 10 }).notNull(),
+  voucherNo: varchar("voucherNo", { length: 80 }).notNull(),
+  category: varchar("category", { length: 80 }).notNull(),
+  description: text("description").notNull(),
+  income: integer("income").default(0).notNull(),
+  expense: integer("expense").default(0).notNull(),
+  pphStatus: varchar("pphStatus", { length: 40 }).default("Bukan Omzet").notNull(),
+  paymentStatus: varchar("paymentStatus", { length: 40 }).default("Belum Dibayar").notNull(),
+  billingCode: varchar("billingCode", { length: 120 }),
+  merchantName: varchar("merchantName", { length: 160 }),
+  sourceType: varchar("sourceType", { length: 30 }).default("manual").notNull(),
+  sourceId: varchar("sourceId", { length: 80 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => ({
+  sourceUnique: uniqueIndex("tax_cash_entries_source_idx").on(table.sourceType, table.sourceId),
+}));
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Product = typeof products.$inferSelect;

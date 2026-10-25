@@ -25,6 +25,7 @@ export const {
   products,
   orders,
   orderItems,
+  taxCashEntries,
   pushSubscriptions,
   promoNotificationLogs,
   promoNotificationDeliveries,

@@ -5,7 +5,7 @@ import { Pool } from "pg";
 import { createPool as createMySqlPool } from "mysql2/promise";
 import { ENV } from "./_core/env";
 import type { InsertUser } from "../drizzle/schema";
-import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, pushSubscriptions, promoNotificationLogs, promoNotificationDeliveries, databaseDialect } from "./db-tables";
+import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, pushSubscriptions, promoNotificationLogs, promoNotificationDeliveries, taxCashEntries, databaseDialect } from "./db-tables";
 
 let _pool: Pool | null = null;
 let _mysqlPool: ReturnType<typeof createMySqlPool> | null = null;
@@ -52,6 +52,7 @@ const ensureMySqlRuntimeColumns = async () => {
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS whatsapp_registration_requests (id int auto_increment primary key, requestCode varchar(40) not null unique, whatsapp varchar(32) null, referralCode varchar(24) null, status varchar(20) not null default 'pending', expiresAt timestamp not null, createdAt timestamp not null default current_timestamp, updatedAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel pendaftaran WhatsApp belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`ALTER TABLE whatsapp_registration_requests ADD COLUMN referralCode varchar(24) NULL`); } catch (error) { const code = (error as { code?: string }).code; if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom referral pendaftaran WhatsApp belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS admin_audit_logs (id int auto_increment primary key, adminName varchar(160) not null, adminWhatsapp varchar(32) not null, action varchar(80) not null, targetRole varchar(20) not null, targetId int not null, targetName varchar(180) not null, details text null, createdAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel audit Admin belum dapat disiapkan:", error instanceof Error ? error.message : error); }
+  try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS tax_cash_entries (id int auto_increment primary key, entryDate varchar(10) not null, voucherNo varchar(80) not null, category varchar(80) not null, description text not null, income int not null default 0, expense int not null default 0, pphStatus varchar(40) not null default 'Bukan Omzet', paymentStatus varchar(40) not null default 'Belum Dibayar', billingCode varchar(120) null, merchantName varchar(160) null, sourceType varchar(30) not null default 'manual', sourceId varchar(80) null, createdAt timestamp not null default current_timestamp, updatedAt timestamp not null default current_timestamp, unique key tax_cash_entries_source_idx (sourceType, sourceId))`); } catch (error) { console.warn("[Database] Tabel Buku Kas Pajak belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   for (const column of ["referralCode varchar(24) NULL", "referredByCode varchar(24) NULL"]) {
     try { await _mysqlPool.query(`ALTER TABLE buyer_profiles ADD COLUMN ${column}`); }
     catch (error) { const code = (error as { code?: string }).code; if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom referral pembeli belum dapat disiapkan:", error instanceof Error ? error.message : error); }
@@ -75,6 +76,7 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         await _pool.query(`CREATE TABLE IF NOT EXISTS "whatsapp_registration_requests" ("id" serial PRIMARY KEY, "requestCode" varchar(40) NOT NULL UNIQUE, "whatsapp" varchar(32), "referralCode" varchar(24), "status" varchar(20) DEFAULT 'pending' NOT NULL, "expiresAt" timestamp NOT NULL, "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL)`);
         await _pool.query(`ALTER TABLE "whatsapp_registration_requests" ADD COLUMN IF NOT EXISTS "referralCode" varchar(24)`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "admin_audit_logs" ("id" serial PRIMARY KEY, "adminName" varchar(160) NOT NULL, "adminWhatsapp" varchar(32) NOT NULL, "action" varchar(80) NOT NULL, "targetRole" varchar(20) NOT NULL, "targetId" integer NOT NULL, "targetName" varchar(180) NOT NULL, "details" text, "createdAt" timestamp DEFAULT now() NOT NULL)`);
+        await _pool.query(`CREATE TABLE IF NOT EXISTS "tax_cash_entries" ("id" serial PRIMARY KEY, "entryDate" varchar(10) NOT NULL, "voucherNo" varchar(80) NOT NULL, "category" varchar(80) NOT NULL, "description" text NOT NULL, "income" integer DEFAULT 0 NOT NULL, "expense" integer DEFAULT 0 NOT NULL, "pphStatus" varchar(40) DEFAULT 'Bukan Omzet' NOT NULL, "paymentStatus" varchar(40) DEFAULT 'Belum Dibayar' NOT NULL, "billingCode" varchar(120), "merchantName" varchar(160), "sourceType" varchar(30) DEFAULT 'manual' NOT NULL, "sourceId" varchar(80), "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL, CONSTRAINT "tax_cash_entries_source_idx" UNIQUE ("sourceType", "sourceId"))`);
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referralCode" varchar(24)`);
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referredByCode" varchar(24)`);
         await _pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "buyer_profiles_referralCode_idx" ON "buyer_profiles" ("referralCode")`);
@@ -401,6 +403,86 @@ export async function listOrders() {
   const db = await getDb(); if (!db) return [];
   const rows = await db.select().from(orders).orderBy(desc(orders.createdAt));
   return Promise.all(rows.map(async (order) => ({ ...order, items: await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)) })));
+}
+
+export type TaxCashEntryInput = {
+  entryDate: string;
+  voucherNo: string;
+  category: string;
+  description: string;
+  income: number;
+  expense: number;
+  pphStatus: string;
+  paymentStatus: string;
+  billingCode?: string | null;
+  merchantName?: string | null;
+};
+
+export async function listTaxCashEntries(year?: number) {
+  const db = await getDb(); if (!db) return [];
+  const rows = await db.select().from(taxCashEntries).orderBy(desc(taxCashEntries.entryDate), desc(taxCashEntries.id));
+  return year ? rows.filter((entry) => entry.entryDate.startsWith(`${year}-`)) : rows;
+}
+
+export async function syncCompletedOrderTaxEntries() {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  const completed = await db.select({ id: orders.id, orderCode: orders.orderCode, subtotal: orders.subtotal, handlingFee: orders.handlingFee, createdAt: orders.createdAt }).from(orders).where(eq(orders.status, "Selesai"));
+  let created = 0;
+  for (const order of completed) {
+    const sourceId = String(order.id);
+    const existing = await db.select({ id: taxCashEntries.id }).from(taxCashEntries).where(and(eq(taxCashEntries.sourceType, "order"), eq(taxCashEntries.sourceId, sourceId))).limit(1);
+    if (existing[0]) continue;
+    const income = Math.max(0, order.handlingFee || 0);
+    await db.insert(taxCashEntries).values({ entryDate: new Date(order.createdAt).toISOString().slice(0, 10), voucherNo: order.orderCode, category: "Pendapatan Komisi", description: `Komisi PASARKU dari pesanan ${order.orderCode} (subtotal Rp${order.subtotal.toLocaleString("id-ID")})`, income, expense: 0, pphStatus: income > 0 ? "Objek PPh 0.5%" : "Bukan Omzet", paymentStatus: income > 0 ? "Sudah Diterima" : "Nihil", sourceType: "order", sourceId });
+    created += 1;
+  }
+  const promoCreated = await syncPromoAdEntries(db);
+  return { created: created + promoCreated, checked: completed.length, promoCreated };
+}
+
+async function syncPromoAdEntries(db: any) {
+  const settings = await getSiteSettings();
+  if (!settings?.promoSlots) return 0;
+  let slots: Array<{ id?: string; title?: string; adFee?: number; adPaymentStatus?: string; adBillingCode?: string; adMerchantName?: string; startsAt?: string }> = [];
+  try { slots = JSON.parse(settings.promoSlots); } catch { return 0; }
+  let created = 0;
+  for (const slot of slots) {
+    const fee = Number(slot.adFee || 0);
+    if (!slot.id || fee <= 0) continue;
+    const sourceId = String(slot.id);
+    const existing = await db.select({ id: taxCashEntries.id }).from(taxCashEntries).where(and(eq(taxCashEntries.sourceType, "promo"), eq(taxCashEntries.sourceId, sourceId))).limit(1);
+    if (existing[0]) continue;
+    await db.insert(taxCashEntries).values({ entryDate: slot.startsAt ? new Date(slot.startsAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10), voucherNo: `IKL-${sourceId}`, category: "Pendapatan Iklan/Banner", description: `Pendapatan banner promo: ${slot.title || sourceId}`, income: fee, expense: 0, pphStatus: "Objek PPh 0.5%", paymentStatus: slot.adPaymentStatus || "Belum Dibayar", billingCode: slot.adBillingCode || null, merchantName: slot.adMerchantName || null, sourceType: "promo", sourceId });
+    created += 1;
+  }
+  return created;
+}
+
+export async function createTaxCashEntry(input: TaxCashEntryInput) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  const values = { ...input, voucherNo: input.voucherNo.trim(), category: input.category.trim(), description: input.description.trim(), merchantName: input.merchantName?.trim() || null, billingCode: input.billingCode?.trim() || null, sourceType: "manual" as const, sourceId: null };
+  await db.insert(taxCashEntries).values(values);
+  const rows = await db.select().from(taxCashEntries).where(eq(taxCashEntries.voucherNo, values.voucherNo)).orderBy(desc(taxCashEntries.id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateTaxCashEntry(id: number, input: TaxCashEntryInput) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  const current = await db.select().from(taxCashEntries).where(eq(taxCashEntries.id, id)).limit(1);
+  if (!current[0]) throw new Error("Catatan Buku Kas tidak ditemukan.");
+  if (current[0].sourceType !== "manual") throw new Error("Catatan otomatis dari pesanan tidak dapat diedit di sini.");
+  await db.update(taxCashEntries).set({ ...input, voucherNo: input.voucherNo.trim(), category: input.category.trim(), description: input.description.trim(), merchantName: input.merchantName?.trim() || null, billingCode: input.billingCode?.trim() || null, updatedAt: new Date() }).where(eq(taxCashEntries.id, id));
+  const rows = await db.select().from(taxCashEntries).where(eq(taxCashEntries.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function deleteTaxCashEntry(id: number) {
+  const db = await getDb(); if (!db) throw new Error("Database belum tersedia.");
+  const current = await db.select().from(taxCashEntries).where(eq(taxCashEntries.id, id)).limit(1);
+  if (!current[0]) throw new Error("Catatan Buku Kas tidak ditemukan.");
+  if (current[0].sourceType !== "manual") throw new Error("Catatan otomatis dari pesanan tidak dapat dihapus di sini.");
+  await db.delete(taxCashEntries).where(eq(taxCashEntries.id, id));
+  return { success: true as const, id };
 }
 
 export async function deleteOrder(orderCode: string, admin: { name: string; whatsapp: string }) {
