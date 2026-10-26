@@ -592,6 +592,16 @@ export async function listAdminAuditLogs() {
   return db.select().from(adminAuditLogs).orderBy(desc(adminAuditLogs.createdAt)).limit(50);
 }
 
+export async function deleteAdminAuditLogs(ids: number[], adminWhatsapp: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database belum tersedia.");
+  if (!isPermanentAdminWhatsapp(adminWhatsapp)) throw new Error("Hanya admin permanen yang dapat menghapus riwayat aktivitas Admin.");
+  const cleanIds = Array.from(new Set(ids)).filter((id) => Number.isInteger(id) && id > 0).slice(0, 50);
+  if (!cleanIds.length) return { success: true as const, deleted: 0 };
+  await db.delete(adminAuditLogs).where(inArray(adminAuditLogs.id, cleanIds));
+  return { success: true as const, deleted: cleanIds.length };
+}
+
 export async function resetMarketplaceData() {
   const db = await getDb();
   if (!db) throw new Error("Database belum tersedia.");
