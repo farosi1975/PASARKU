@@ -10,5 +10,7 @@ export const SAWAHAN_VILLAGES = [
   "Bendolo",
 ] as const;
 
+export const PASARKU_REGENCY = "Nganjuk";
+export const PASARKU_DISTRICT = "Sawahan";
 export const LOCATION_OTHER = "Kecamatan lainnya";
 export const SAWAHAN_LOCATION_OPTIONS = [...SAWAHAN_VILLAGES, LOCATION_OTHER] as const;

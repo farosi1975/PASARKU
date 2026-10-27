@@ -18,6 +18,8 @@ export type Product = {
   sellerFreeShipping?: boolean;
   storeLocation?: string | null;
   storeVillage?: string;
+  storeDistrict?: string;
+  storeRegency?: string;
   openingTime?: string;
   closingTime?: string;
 };
