@@ -46,6 +46,11 @@ const ensureMySqlRuntimeColumns = async () => {
     const code = (error as { code?: string }).code;
     if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom lokasi kurir belum dapat disiapkan:", error instanceof Error ? error.message : error);
   }
+  try { await _mysqlPool.query(`ALTER TABLE seller_profiles ADD COLUMN district varchar(80) NOT NULL DEFAULT 'Sawahan'`); }
+  catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom kecamatan toko belum dapat disiapkan:", error instanceof Error ? error.message : error);
+  }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (id int auto_increment primary key, endpoint varchar(512) not null unique, p256dh text not null, auth text not null, userAgent varchar(500) null, createdAt timestamp not null default current_timestamp, updatedAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel subscription push belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_logs (id int auto_increment primary key, slotId varchar(120) not null unique, sentAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel log promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_deliveries (id int auto_increment primary key, slotId varchar(120) not null, endpoint varchar(512) not null, sentAt timestamp not null default current_timestamp, unique key promo_notification_deliveries_slot_endpoint_idx (slotId, endpoint))`); } catch (error) { console.warn("[Database] Tabel delivery promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
@@ -77,6 +82,7 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         await _pool.query(`ALTER TABLE "whatsapp_registration_requests" ADD COLUMN IF NOT EXISTS "referralCode" varchar(24)`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "admin_audit_logs" ("id" serial PRIMARY KEY, "adminName" varchar(160) NOT NULL, "adminWhatsapp" varchar(32) NOT NULL, "action" varchar(80) NOT NULL, "targetRole" varchar(20) NOT NULL, "targetId" integer NOT NULL, "targetName" varchar(180) NOT NULL, "details" text, "createdAt" timestamp DEFAULT now() NOT NULL)`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "tax_cash_entries" ("id" serial PRIMARY KEY, "entryDate" varchar(10) NOT NULL, "voucherNo" varchar(80) NOT NULL, "category" varchar(80) NOT NULL, "description" text NOT NULL, "income" integer DEFAULT 0 NOT NULL, "expense" integer DEFAULT 0 NOT NULL, "pphStatus" varchar(40) DEFAULT 'Bukan Omzet' NOT NULL, "paymentStatus" varchar(40) DEFAULT 'Belum Dibayar' NOT NULL, "billingCode" varchar(120), "merchantName" varchar(160), "sourceType" varchar(30) DEFAULT 'manual' NOT NULL, "sourceId" varchar(80), "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL, CONSTRAINT "tax_cash_entries_source_idx" UNIQUE ("sourceType", "sourceId"))`);
+        await _pool.query(`ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "district" varchar(80) NOT NULL DEFAULT 'Sawahan'`);
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referralCode" varchar(24)`);
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referredByCode" varchar(24)`);
         await _pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "buyer_profiles_referralCode_idx" ON "buyer_profiles" ("referralCode")`);
@@ -114,7 +120,7 @@ export async function listApprovedProducts() {
   const rows = await db.select({ product: products, seller: sellerProfiles }).from(products).innerJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(and(eq(products.status, "approved"), eq(sellerProfiles.verificationStatus, "verified"), eq(sellerProfiles.isBanned, 0), eq(sellerProfiles.isOpen, 1))).orderBy(desc(products.createdAt));
   const now = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
   const minutes = (value: string) => { const [hour, minute] = value.split(":").map(Number); return hour * 60 + minute; };
-  return rows.filter(({ seller }) => { const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime); return opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing; }).map(({ product, seller }) => ({ ...product, sellerFreeShipping: Boolean(seller.freeShipping), sellerLocation: seller.currentLocation, sellerVillage: seller.village, openingTime: seller.openingTime, closingTime: seller.closingTime }));
+  return rows.filter(({ seller }) => { const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime); return opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing; }).map(({ product, seller }) => ({ ...product, sellerFreeShipping: Boolean(seller.freeShipping), sellerLocation: seller.currentLocation, sellerVillage: seller.village, sellerDistrict: seller.district, openingTime: seller.openingTime, closingTime: seller.closingTime }));
 }
 
 export async function listOpenStores() {
@@ -125,7 +131,7 @@ export async function listOpenStores() {
   const openRows = rows.filter(({ seller }) => { const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime); return opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing; });
   const stores = new Map<number, any>();
   for (const { product, seller } of openRows) {
-    const current = stores.get(seller.id) ?? { id: seller.id, shopName: seller.shopName, ownerName: seller.ownerName, whatsapp: seller.whatsapp, village: seller.village, address: seller.address, avatarUrl: seller.avatarUrl, currentLocation: seller.currentLocation, openingTime: seller.openingTime, closingTime: seller.closingTime, freeShipping: Boolean(seller.freeShipping), productCount: 0, previewProducts: [] };
+    const current = stores.get(seller.id) ?? { id: seller.id, shopName: seller.shopName, ownerName: seller.ownerName, whatsapp: seller.whatsapp, village: seller.village, district: seller.district, address: seller.address, avatarUrl: seller.avatarUrl, currentLocation: seller.currentLocation, openingTime: seller.openingTime, closingTime: seller.closingTime, freeShipping: Boolean(seller.freeShipping), productCount: 0, previewProducts: [] };
     current.productCount += 1;
     if (current.previewProducts.length < 3) current.previewProducts.push({ id: product.id, name: product.name, imageUrl: product.imageUrl, price: product.price });
     stores.set(seller.id, current);
@@ -144,8 +150,8 @@ export async function getPublicStoreDetail(sellerId: number) {
   const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime);
   const withinSchedule = opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing;
   return {
-    store: { id: seller.id, shopName: seller.shopName, ownerName: seller.ownerName, whatsapp: seller.whatsapp, village: seller.village, address: seller.address, currentLocation: seller.currentLocation, avatarUrl: seller.avatarUrl, openingTime: seller.openingTime, closingTime: seller.closingTime, isOpen: Boolean(seller.isOpen), withinSchedule, freeShipping: Boolean(seller.freeShipping), productCount: productRows.length },
-    products: productRows.map((product) => ({ ...product, sellerFreeShipping: Boolean(seller.freeShipping), sellerLocation: seller.currentLocation, sellerVillage: seller.village, openingTime: seller.openingTime, closingTime: seller.closingTime, storeOpen: Boolean(seller.isOpen && withinSchedule) })),
+    store: { id: seller.id, shopName: seller.shopName, ownerName: seller.ownerName, whatsapp: seller.whatsapp, village: seller.village, district: seller.district, address: seller.address, currentLocation: seller.currentLocation, avatarUrl: seller.avatarUrl, openingTime: seller.openingTime, closingTime: seller.closingTime, isOpen: Boolean(seller.isOpen), withinSchedule, freeShipping: Boolean(seller.freeShipping), productCount: productRows.length },
+    products: productRows.map((product) => ({ ...product, sellerFreeShipping: Boolean(seller.freeShipping), sellerLocation: seller.currentLocation, sellerVillage: seller.village, sellerDistrict: seller.district, openingTime: seller.openingTime, closingTime: seller.closingTime, storeOpen: Boolean(seller.isOpen && withinSchedule) })),
   };
 }
 

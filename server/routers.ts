@@ -52,7 +52,7 @@ const adminChallenges = new Map<string, { otp: string; expiresAt: number; attemp
 const adminSessions = new Map<string, { whatsapp: string; expiresAt: number }>();
 const ADMIN_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const buyerChallenges = new Map<string, { otp: string; name?: string; referralCode?: string; expiresAt: number; attempts: number }>();
-const sellerChallenges = new Map<string, { otp: string; shopName: string; ownerName: string; village: string; expiresAt: number; attempts: number }>();
+const sellerChallenges = new Map<string, { otp: string; shopName: string; ownerName: string; village: string; expiresAt: number; attempts: number; district: string }>();
 const courierChallenges = new Map<string, { otp: string; name: string; vehicle: string; expiresAt: number; attempts: number }>();
 const normalizePhone = (value: string) => { const digits = value.replace(/\D/g, ""); return digits.startsWith("0") ? `62${digits.slice(1)}` : digits; };
 const requirePermanentAdmin = (admin: { whatsapp: string }) => {
@@ -371,7 +371,7 @@ export const appRouter = router({
     }),
     sellerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
       const db = await dbRequired();
-      const rows = await db.select({ id: sellerProfiles.id, shopName: sellerProfiles.shopName, ownerName: sellerProfiles.ownerName, whatsapp: sellerProfiles.whatsapp, avatarUrl: sellerProfiles.avatarUrl, village: sellerProfiles.village, address: sellerProfiles.address, currentLocation: sellerProfiles.currentLocation, openingTime: sellerProfiles.openingTime, closingTime: sellerProfiles.closingTime, preferredCourierId: sellerProfiles.preferredCourierId, isOpen: sellerProfiles.isOpen, freeShipping: sellerProfiles.freeShipping, verificationStatus: sellerProfiles.verificationStatus, isBanned: sellerProfiles.isBanned, verifiedAt: sellerProfiles.verifiedAt }).from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      const rows = await db.select({ id: sellerProfiles.id, shopName: sellerProfiles.shopName, ownerName: sellerProfiles.ownerName, whatsapp: sellerProfiles.whatsapp, avatarUrl: sellerProfiles.avatarUrl, village: sellerProfiles.village, district: sellerProfiles.district, address: sellerProfiles.address, currentLocation: sellerProfiles.currentLocation, openingTime: sellerProfiles.openingTime, closingTime: sellerProfiles.closingTime, preferredCourierId: sellerProfiles.preferredCourierId, isOpen: sellerProfiles.isOpen, freeShipping: sellerProfiles.freeShipping, verificationStatus: sellerProfiles.verificationStatus, isBanned: sellerProfiles.isBanned, verifiedAt: sellerProfiles.verifiedAt }).from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
       return rows[0] ?? null;
     }),
     setSellerOpen: publicProcedure.input(z.object({ whatsapp: phone, isOpen: z.boolean() })).mutation(async ({ input }) => {
@@ -402,11 +402,11 @@ export const appRouter = router({
       await db.update(sellerProfiles).set({ freeShipping: input.freeShipping ? 1 : 0, updatedAt: new Date() }).where(eq(sellerProfiles.id, seller[0].id));
       return { freeShipping: input.freeShipping } as const;
     }),
-    updateSellerProfile: publicProcedure.input(z.object({ whatsapp: phone, shopName: z.string().min(2).max(160), ownerName: z.string().min(2).max(160), village: z.string().min(2).max(80), address: z.string().max(500).optional(), avatarData: z.string().optional() })).mutation(async ({ input }) => {
+    updateSellerProfile: publicProcedure.input(z.object({ whatsapp: phone, shopName: z.string().min(2).max(160), ownerName: z.string().min(2).max(160), village: z.string().min(2).max(80), district: z.string().min(2).max(80).default("Sawahan"), address: z.string().max(500).optional(), avatarData: z.string().optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1);
       if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual belum terverifikasi." });
       const avatarUrl = input.avatarData ? await uploadAvatar(whatsapp, input.avatarData) : seller[0].avatarUrl;
-      await db.update(sellerProfiles).set({ shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, address: input.address?.trim() || null, avatarUrl, updatedAt: new Date() }).where(eq(sellerProfiles.id, seller[0].id));
+      await db.update(sellerProfiles).set({ shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, district: input.district, address: input.address?.trim() || null, avatarUrl, updatedAt: new Date() }).where(eq(sellerProfiles.id, seller[0].id));
       const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.id, seller[0].id)).limit(1); return rows[0];
     }),
     shippingSettings: publicProcedure.query(() => getShippingSettings()),
@@ -434,11 +434,11 @@ export const appRouter = router({
       await db.update(sellerProfiles).set({ preferredCourierId: input.courierId }).where(eq(sellerProfiles.id, seller[0].id));
       return { preferredCourierId: input.courierId } as const;
     }),
-    requestSellerOtp: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2) })).mutation(async ({ input }) => {
+    requestSellerOtp: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), district: z.string().min(2).max(80).default("Sawahan") })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
       beginOtpSend("seller", whatsapp);
       const otp = String(randomInt(100000, 1000000));
-      sellerChallenges.set(whatsapp, { otp, shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 });
+      sellerChallenges.set(whatsapp, { otp, shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, district: input.district, expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 });
       try { await sendFonnteMessage(whatsapp, `Kode OTP Penjual PASARKU: ${otp}. Berlaku 5 menit. Jangan bagikan kode ini.`); }
       catch (error) { sellerChallenges.delete(whatsapp); cancelOtpCooldown("seller", whatsapp); throw new TRPCError({ code: "BAD_GATEWAY", message: error instanceof Error ? error.message : "OTP FONNTE gagal dikirim." }); }
       return { success: true, expiresIn: 300 } as const;
@@ -447,15 +447,15 @@ export const appRouter = router({
       const whatsapp = normalizePhone(input.whatsapp); const challenge = sellerChallenges.get(whatsapp);
       if (!challenge || challenge.expiresAt < Date.now()) throw new TRPCError({ code: "UNAUTHORIZED", message: "OTP penjual belum benar atau sudah kedaluwarsa. Minta OTP baru." });
       if (challenge.otp !== input.otp) { const error = invalidOtp(challenge, "OTP penjual belum benar."); if (challenge.attempts >= OTP_MAX_ATTEMPTS) sellerChallenges.delete(whatsapp); throw error; }
-      const db = await dbRequired(); await db.insert(sellerProfiles).values({ shopName: challenge.shopName, ownerName: challenge.ownerName, whatsapp, village: challenge.village, verificationStatus: "verified", verifiedAt: new Date() }).onConflictDoUpdate({ target: sellerProfiles.whatsapp, set: { shopName: challenge.shopName, ownerName: challenge.ownerName, village: challenge.village, verificationStatus: "verified", verifiedAt: new Date() } });
+      const db = await dbRequired(); await db.insert(sellerProfiles).values({ shopName: challenge.shopName, ownerName: challenge.ownerName, whatsapp, village: challenge.village, district: challenge.district, verificationStatus: "verified", verifiedAt: new Date() }).onConflictDoUpdate({ target: sellerProfiles.whatsapp, set: { shopName: challenge.shopName, ownerName: challenge.ownerName, village: challenge.village, district: challenge.district, verificationStatus: "verified", verifiedAt: new Date() } });
       sellerChallenges.delete(whatsapp); const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); await upsertAccountRole(whatsapp, "seller", challenge.ownerName); return rows[0];
     }),
-    registerSeller: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), identityPhotoData: z.string().optional(), selfiePhotoData: z.string().optional() })).mutation(async ({ input }) => {
+    registerSeller: publicProcedure.input(z.object({ shopName: z.string().min(2), ownerName: z.string().min(2), whatsapp: phone, village: z.string().min(2), district: z.string().min(2).max(80).default("Sawahan"), identityPhotoData: z.string().optional(), selfiePhotoData: z.string().optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existing = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); if (existing[0]?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun toko ini diblokir oleh Admin PASARKU." });
       if (!input.identityPhotoData || !input.selfiePhotoData) throw new TRPCError({ code: "BAD_REQUEST", message: "Foto KTP/identitas dan selfie wajib diunggah untuk verifikasi Admin." });
       const identityPhoto = await uploadIdentityPhoto(whatsapp, "identity", input.identityPhotoData); const selfiePhoto = await uploadIdentityPhoto(whatsapp, "selfie", input.selfiePhotoData);
       const identityPhotoUrl = identityPhoto?.url ?? null; const selfiePhotoUrl = selfiePhoto?.url ?? null; const identityPhotoKey = identityPhoto?.key ?? null; const selfiePhotoKey = selfiePhoto?.key ?? null;
-      await db.insert(sellerProfiles).values({ shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), whatsapp, identityPhotoUrl, selfiePhotoUrl, identityPhotoKey, selfiePhotoKey, village: input.village, verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null }).onConflictDoUpdate({ target: sellerProfiles.whatsapp, set: { shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, identityPhotoUrl, selfiePhotoUrl, identityPhotoKey, selfiePhotoKey, verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null, updatedAt: new Date() } });
+      await db.insert(sellerProfiles).values({ shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), whatsapp, identityPhotoUrl, selfiePhotoUrl, identityPhotoKey, selfiePhotoKey, village: input.village, district: input.district, verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null }).onConflictDoUpdate({ target: sellerProfiles.whatsapp, set: { shopName: input.shopName.trim(), ownerName: input.ownerName.trim(), village: input.village, district: input.district, identityPhotoUrl, selfiePhotoUrl, identityPhotoKey, selfiePhotoKey, verificationStatus: "pending", documentsReviewedAt: null, verifiedAt: null, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "seller", input.ownerName.trim());
       const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),

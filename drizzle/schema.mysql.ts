@@ -23,6 +23,7 @@ export const sellerProfiles = mysqlTable("seller_profiles", {
   identityPhotoKey: text("identityPhotoKey"),
   selfiePhotoKey: text("selfiePhotoKey"),
   village: varchar("village", { length: 80 }).notNull(),
+  district: varchar("district", { length: 80 }).default("Sawahan").notNull(),
   address: text("address"),
   currentLocation: text("currentLocation"),
   openingTime: varchar("openingTime", { length: 5 }).default("08:00").notNull(),
