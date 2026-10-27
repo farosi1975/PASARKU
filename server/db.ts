@@ -51,6 +51,11 @@ const ensureMySqlRuntimeColumns = async () => {
     const code = (error as { code?: string }).code;
     if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom kecamatan toko belum dapat disiapkan:", error instanceof Error ? error.message : error);
   }
+  try { await _mysqlPool.query(`ALTER TABLE courier_profiles ADD COLUMN district varchar(80) NOT NULL DEFAULT 'Sawahan'`); }
+  catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom kecamatan kurir belum dapat disiapkan:", error instanceof Error ? error.message : error);
+  }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (id int auto_increment primary key, endpoint varchar(512) not null unique, p256dh text not null, auth text not null, userAgent varchar(500) null, createdAt timestamp not null default current_timestamp, updatedAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel subscription push belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_logs (id int auto_increment primary key, slotId varchar(120) not null unique, sentAt timestamp not null default current_timestamp)`); } catch (error) { console.warn("[Database] Tabel log promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
   try { await _mysqlPool.query(`CREATE TABLE IF NOT EXISTS promo_notification_deliveries (id int auto_increment primary key, slotId varchar(120) not null, endpoint varchar(512) not null, sentAt timestamp not null default current_timestamp, unique key promo_notification_deliveries_slot_endpoint_idx (slotId, endpoint))`); } catch (error) { console.warn("[Database] Tabel delivery promo belum dapat disiapkan:", error instanceof Error ? error.message : error); }
@@ -83,6 +88,7 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         await _pool.query(`CREATE TABLE IF NOT EXISTS "admin_audit_logs" ("id" serial PRIMARY KEY, "adminName" varchar(160) NOT NULL, "adminWhatsapp" varchar(32) NOT NULL, "action" varchar(80) NOT NULL, "targetRole" varchar(20) NOT NULL, "targetId" integer NOT NULL, "targetName" varchar(180) NOT NULL, "details" text, "createdAt" timestamp DEFAULT now() NOT NULL)`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "tax_cash_entries" ("id" serial PRIMARY KEY, "entryDate" varchar(10) NOT NULL, "voucherNo" varchar(80) NOT NULL, "category" varchar(80) NOT NULL, "description" text NOT NULL, "income" integer DEFAULT 0 NOT NULL, "expense" integer DEFAULT 0 NOT NULL, "pphStatus" varchar(40) DEFAULT 'Bukan Omzet' NOT NULL, "paymentStatus" varchar(40) DEFAULT 'Belum Dibayar' NOT NULL, "billingCode" varchar(120), "merchantName" varchar(160), "sourceType" varchar(30) DEFAULT 'manual' NOT NULL, "sourceId" varchar(80), "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL, CONSTRAINT "tax_cash_entries_source_idx" UNIQUE ("sourceType", "sourceId"))`);
         await _pool.query(`ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "district" varchar(80) NOT NULL DEFAULT 'Sawahan'`);
+        await _pool.query(`ALTER TABLE "courier_profiles" ADD COLUMN IF NOT EXISTS "district" varchar(80) NOT NULL DEFAULT 'Sawahan'`);
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referralCode" varchar(24)`);
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referredByCode" varchar(24)`);
         await _pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "buyer_profiles_referralCode_idx" ON "buyer_profiles" ("referralCode")`);
@@ -521,7 +527,7 @@ export async function listCourierOrders(courierId: number) {
   const db = await getDb(); if (!db) return [];
   const assignedOrders = await db.select().from(orders).where(eq(orders.courierId, courierId)).orderBy(desc(orders.createdAt));
   return Promise.all(assignedOrders.map(async (order) => {
-    const sellerRows = await db.select({ shopName: sellerProfiles.shopName, village: sellerProfiles.village, currentLocation: sellerProfiles.currentLocation })
+    const sellerRows = await db.select({ shopName: sellerProfiles.shopName, village: sellerProfiles.village, district: sellerProfiles.district, currentLocation: sellerProfiles.currentLocation })
       .from(orderItems)
       .innerJoin(products, eq(orderItems.productId, products.id))
       .innerJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id))
@@ -532,6 +538,7 @@ export async function listCourierOrders(courierId: number) {
       ...order,
       pickupShopName: seller?.shopName ?? "Penjual PASARKU",
       pickupVillage: seller?.village ?? "Sawahan",
+      pickupDistrict: seller?.district ?? "Sawahan",
       pickupLocation: seller?.currentLocation ?? order.pickupLocation,
       courierCurrentLocation: (await db.select({ currentLocation: courierProfiles.currentLocation }).from(courierProfiles).where(eq(courierProfiles.id, courierId)).limit(1))[0]?.currentLocation ?? null,
       courierLocationUpdatedAt: (await db.select({ updatedAt: courierProfiles.updatedAt }).from(courierProfiles).where(eq(courierProfiles.id, courierId)).limit(1))[0]?.updatedAt ?? null,
@@ -544,7 +551,7 @@ type AdminCourierTask = { orderCode: string; action: "pick up" | "mengantar"; st
 
 export async function listCouriers() {
   const db = await getDb(); if (!db) return [];
-  const couriers = await db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle, currentLocation: courierProfiles.currentLocation, updatedAt: courierProfiles.updatedAt, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned }).from(courierProfiles).where(and(eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).orderBy(courierProfiles.name);
+  const couriers = await db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp, vehicle: courierProfiles.vehicle, village: courierProfiles.village, district: courierProfiles.district, currentLocation: courierProfiles.currentLocation, updatedAt: courierProfiles.updatedAt, verificationStatus: courierProfiles.verificationStatus, isBanned: courierProfiles.isBanned }).from(courierProfiles).where(and(eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).orderBy(courierProfiles.name);
   if (!couriers.length) return couriers.map((courier) => ({ ...courier, activeTasks: [] as AdminCourierTask[] }));
   const activeOrders = await db.select({ id: orders.id, orderCode: orders.orderCode, courierId: orders.courierId, status: orders.status, customerName: orders.customerName, address: orders.address, village: orders.village, pickupLocation: orders.pickupLocation })
     .from(orders)

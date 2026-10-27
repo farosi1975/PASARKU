@@ -56,6 +56,7 @@ export const courierProfiles = pgTable("courier_profiles", {
   selfiePhotoKey: text("selfiePhotoKey"),
   vehicle: varchar("vehicle", { length: 40 }).notNull(),
   village: varchar("village", { length: 80 }).default("Sawahan").notNull(),
+  district: varchar("district", { length: 80 }).default("Sawahan").notNull(),
   address: text("address"),
   currentLocation: text("currentLocation"),
   verificationStatus: verificationStatusEnum("verificationStatus").default("pending").notNull(),

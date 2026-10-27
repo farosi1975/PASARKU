@@ -36,6 +36,7 @@ export type MockOrder = {
   pickupLocation?: string | null;
   pickupShopName?: string | null;
   pickupVillage?: string | null;
+  pickupDistrict?: string | null;
   routeDistanceKm?: number | null;
   subtotal?: number;
   delivery?: number;

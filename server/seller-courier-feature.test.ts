@@ -55,7 +55,8 @@ describe("seller and courier dashboard features", () => {
     expect(db).toContain("pickupShopName");
     expect(db).toContain("sellerProfiles.shopName");
     expect(courierPage).toContain("order.pickupShopName");
-    expect(courierPage).toContain("const assigned = useMemo(() => courier ? remoteOrders : []");
+    expect(courierPage).toContain("taskDistrictFilter");
+    expect(courierPage).toContain("pickupDistrict");
     expect(adminPage).toContain('order.status !== "Selesai"');
   });
 });

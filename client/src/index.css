@@ -589,6 +589,10 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .courier-section-heading h2 { margin: 0; font-family: "Space Grotesk", sans-serif; font-size: 22px; letter-spacing: -.06em; }
 .courier-section-heading p { margin: 5px 0 0; color: var(--muted); font-size: 10px; }
 .courier-task-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; margin-top: 18px; }
+.courier-task-filter { display: flex; align-items: end; justify-content: space-between; gap: 14px; margin-top: 16px; padding: 12px 14px; border: 1px solid #eadbd2; border-radius: 12px; background: #fffaf6; }
+.courier-task-filter label { display: grid; gap: 5px; color: #6d5148; font-size: 10px; font-weight: 700; }
+.courier-task-filter select { min-width: 210px; min-height: 38px; border: 1px solid #eadbd2; border-radius: 8px; padding: 0 10px; color: #5b443b; background: #fff; font-size: 11px; }
+.courier-task-filter small { color: var(--muted); font-size: 10px; }
 .courier-task { padding: 18px; border: 1px solid var(--line); border-radius: 15px; background: #fffdf9; box-shadow: 0 6px 18px rgba(50,43,33,.03); }
 .courier-task.completed { opacity: .68; }
 .task-top { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding-bottom: 15px; border-bottom: 1px solid #f0ede8; }
@@ -622,7 +626,7 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .courier-empty { display: flex; flex-direction: column; align-items: center; padding: 60px 30px; text-align: center; }
 .courier-empty h3 { margin: 13px 0 5px; font-family: "Space Grotesk", sans-serif; font-size: 18px; }
 .courier-empty p { margin: 0; color: var(--muted); font-size: 10px; }
-@media (max-width: 720px) { .courier-login h1 { font-size: 35px; } .courier-login .brand { margin-bottom: 45px; } .courier-main { padding: 34px 0 60px; } .courier-welcome { align-items: start; flex-direction: column; } .courier-welcome h1 { font-size: 31px; } .courier-date { align-self: stretch; } .courier-stats { gap: 8px; } .courier-stats > div { padding: 10px; } .courier-stat-icon { width: 27px; height: 27px; } .courier-stats small { font-size: 7px; } .courier-stats strong { font-size: 17px; } .courier-section-heading { align-items: start; flex-direction: column; } .courier-section-heading .outline-button { align-self: stretch; } .courier-task-list { grid-template-columns: 1fr; } .courier-help { align-items: start; flex-wrap: wrap; } .courier-help .outline-button { width: 100%; justify-content: center; } }
+@media (max-width: 720px) { .courier-login h1 { font-size: 35px; } .courier-login .brand { margin-bottom: 45px; } .courier-main { padding: 34px 0 60px; } .courier-welcome { align-items: start; flex-direction: column; } .courier-welcome h1 { font-size: 31px; } .courier-date { align-self: stretch; } .courier-stats { gap: 8px; } .courier-stats > div { padding: 10px; } .courier-stat-icon { width: 27px; height: 27px; } .courier-stats small { font-size: 7px; } .courier-stats strong { font-size: 17px; } .courier-section-heading { align-items: start; flex-direction: column; } .courier-section-heading .outline-button { align-self: stretch; } .courier-task-list { grid-template-columns: 1fr; } .courier-task-filter { align-items: stretch; flex-direction: column; } .courier-task-filter select { width: 100%; min-width: 0; } .courier-help { align-items: start; flex-wrap: wrap; } .courier-help .outline-button { width: 100%; justify-content: center; } }
 
 /* User auth simulation */
 .auth-page { min-height: 100vh; overflow: hidden; color: #fff; background: #39334f; position: relative; }
