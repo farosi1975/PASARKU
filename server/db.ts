@@ -63,6 +63,11 @@ const ensureMySqlRuntimeColumns = async () => {
     const code = (error as { code?: string }).code;
     if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom kecamatan toko belum dapat disiapkan:", error instanceof Error ? error.message : error);
   }
+  try { await _mysqlPool.query(`ALTER TABLE seller_profiles ADD COLUMN handlingFeePercent int NULL`); }
+  catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom biaya penanganan toko belum dapat disiapkan:", error instanceof Error ? error.message : error);
+  }
   try { await _mysqlPool.query(`ALTER TABLE courier_profiles ADD COLUMN district varchar(80) NOT NULL DEFAULT 'Sawahan'`); }
   catch (error) {
     const code = (error as { code?: string }).code;
@@ -100,6 +105,7 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         await _pool.query(`CREATE TABLE IF NOT EXISTS "admin_audit_logs" ("id" serial PRIMARY KEY, "adminName" varchar(160) NOT NULL, "adminWhatsapp" varchar(32) NOT NULL, "action" varchar(80) NOT NULL, "targetRole" varchar(20) NOT NULL, "targetId" integer NOT NULL, "targetName" varchar(180) NOT NULL, "details" text, "createdAt" timestamp DEFAULT now() NOT NULL)`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "tax_cash_entries" ("id" serial PRIMARY KEY, "entryDate" varchar(10) NOT NULL, "voucherNo" varchar(80) NOT NULL, "category" varchar(80) NOT NULL, "description" text NOT NULL, "income" integer DEFAULT 0 NOT NULL, "expense" integer DEFAULT 0 NOT NULL, "pphStatus" varchar(40) DEFAULT 'Bukan Omzet' NOT NULL, "paymentStatus" varchar(40) DEFAULT 'Belum Dibayar' NOT NULL, "billingCode" varchar(120), "merchantName" varchar(160), "sourceType" varchar(30) DEFAULT 'manual' NOT NULL, "sourceId" varchar(80), "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL, CONSTRAINT "tax_cash_entries_source_idx" UNIQUE ("sourceType", "sourceId"))`);
         await _pool.query(`ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "district" varchar(80) NOT NULL DEFAULT 'Sawahan'`);
+        await _pool.query(`ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "handlingFeePercent" integer`);
         await _pool.query(`ALTER TABLE "courier_profiles" ADD COLUMN IF NOT EXISTS "district" varchar(80) NOT NULL DEFAULT 'Sawahan'`);
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referralCode" varchar(24)`);
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referredByCode" varchar(24)`);
@@ -145,7 +151,7 @@ export async function listApprovedProducts() {
   const rows = await db.select({ product: products, seller: sellerProfiles }).from(products).innerJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(and(eq(products.status, "approved"), eq(sellerProfiles.verificationStatus, "verified"), eq(sellerProfiles.isBanned, 0), eq(sellerProfiles.isOpen, 1))).orderBy(desc(products.createdAt));
   const now = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
   const minutes = (value: string) => { const [hour, minute] = value.split(":").map(Number); return hour * 60 + minute; };
-  return rows.filter(({ seller }) => { const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime); return opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing; }).map(({ product, seller }) => ({ ...product, sellerFreeShipping: Boolean(seller.freeShipping), sellerLocation: seller.currentLocation, sellerVillage: seller.village, sellerDistrict: seller.district, openingTime: seller.openingTime, closingTime: seller.closingTime }));
+  return rows.filter(({ seller }) => { const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime); return opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing; }).map(({ product, seller }) => ({ ...product, sellerFreeShipping: Boolean(seller.freeShipping), storeHandlingFeePercent: seller.handlingFeePercent, sellerLocation: seller.currentLocation, sellerVillage: seller.village, sellerDistrict: seller.district, openingTime: seller.openingTime, closingTime: seller.closingTime }));
 }
 
 export async function listOpenStores() {
@@ -212,6 +218,15 @@ export async function getShippingSettings() {
   const rows = await db.select().from(shippingSettings).where(eq(shippingSettings.id, 1)).limit(1);
   const settings = rows[0];
   return settings ? { ratePerKm: settings.ratePerKm, discountPercent: settings.discountPercent, handlingFeePercent: settings.handlingFeePercent, originLatitude: settings.originLatitude, originLongitude: settings.originLongitude, adminWhatsapp: settings.adminWhatsapp, supportOpeningTime: settings.supportOpeningTime, supportClosingTime: settings.supportClosingTime } : { ratePerKm: 3000, discountPercent: 0, originLatitude: "-7.602345", originLongitude: "111.904321", adminWhatsapp: "6281456015901", handlingFeePercent: 0, supportOpeningTime: "08:00", supportClosingTime: "20:00" };
+}
+
+export async function updateSellerHandlingFee(id: number, handlingFeePercent: number | null) {
+  const db = await getDb();
+  if (!db) throw new Error("Database belum tersedia.");
+  await db.update(sellerProfiles).set({ handlingFeePercent, updatedAt: new Date() }).where(eq(sellerProfiles.id, id));
+  const rows = await db.select({ id: sellerProfiles.id, shopName: sellerProfiles.shopName, handlingFeePercent: sellerProfiles.handlingFeePercent }).from(sellerProfiles).where(eq(sellerProfiles.id, id)).limit(1);
+  if (!rows[0]) throw new Error("Toko tidak ditemukan.");
+  return rows[0];
 }
 
 export async function saveShippingSettings(input: { ratePerKm: number; discountPercent: number; handlingFeePercent: number; originLatitude: string; originLongitude: string; adminWhatsapp: string; supportOpeningTime: string; supportClosingTime: string }) {

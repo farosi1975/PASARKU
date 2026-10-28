@@ -1367,3 +1367,27 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
   .auth-tabs { gap: 9px; }
   .auth-tabs button { min-height: 50px; padding: 0 15px; font-size: 11px; }
 }
+
+.seller-fee-admin-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 150px;
+}
+
+.seller-fee-admin-control input {
+  width: 64px;
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.seller-fee-admin-control button {
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .seller-fee-admin-control {
+    min-width: 138px;
+    flex-wrap: wrap;
+  }
+}

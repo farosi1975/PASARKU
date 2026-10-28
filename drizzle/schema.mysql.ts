@@ -31,6 +31,7 @@ export const sellerProfiles = mysqlTable("seller_profiles", {
   preferredCourierId: int("preferredCourierId"),
   isOpen: int("isOpen").default(1).notNull(),
   freeShipping: int("freeShipping").default(0).notNull(),
+  handlingFeePercent: int("handlingFeePercent"),
   verificationStatus: mysqlEnum("verificationStatus", ["pending", "verified", "rejected", "unverified"]).default("pending").notNull(),
   documentsReviewedAt: timestamp("documentsReviewedAt"),
   isBanned: int("isBanned").default(0).notNull(),

@@ -37,6 +37,7 @@ export const sellerProfiles = pgTable("seller_profiles", {
   preferredCourierId: integer("preferredCourierId"),
   isOpen: integer("isOpen").default(1).notNull(),
   freeShipping: integer("freeShipping").default(0).notNull(),
+  handlingFeePercent: integer("handlingFeePercent"),
   verificationStatus: verificationStatusEnum("verificationStatus").default("pending").notNull(),
   documentsReviewedAt: timestamp("documentsReviewedAt"),
   isBanned: integer("isBanned").default(0).notNull(),

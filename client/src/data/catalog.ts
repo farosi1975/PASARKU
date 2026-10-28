@@ -19,6 +19,7 @@ export type Product = {
   badge?: string;
   storeOpen?: boolean;
   sellerFreeShipping?: boolean;
+  storeHandlingFeePercent?: number | null;
   storeLocation?: string | null;
   storeVillage?: string;
   storeDistrict?: string;

@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { createSupportTicket, findBuyerByReferralCode, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminAuditLogs, deleteAdminProfile, deleteOrder, deleteSupportTicket, saveShippingSettings, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole, savePushSubscription, removePushSubscription, isPermanentAdminWhatsapp, listTaxCashEntries, syncCompletedOrderTaxEntries, createTaxCashEntry, updateTaxCashEntry, deleteTaxCashEntry } from "./db";
+import { createSupportTicket, findBuyerByReferralCode, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminAuditLogs, deleteAdminProfile, deleteOrder, deleteSupportTicket, saveShippingSettings, updateSellerHandlingFee, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole, savePushSubscription, removePushSubscription, isPermanentAdminWhatsapp, listTaxCashEntries, syncCompletedOrderTaxEntries, createTaxCashEntry, updateTaxCashEntry, deleteTaxCashEntry } from "./db";
 import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "./db-tables";
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -371,7 +371,7 @@ export const appRouter = router({
     }),
     sellerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(async ({ input }) => {
       const db = await dbRequired();
-      const rows = await db.select({ id: sellerProfiles.id, shopName: sellerProfiles.shopName, ownerName: sellerProfiles.ownerName, whatsapp: sellerProfiles.whatsapp, avatarUrl: sellerProfiles.avatarUrl, village: sellerProfiles.village, district: sellerProfiles.district, address: sellerProfiles.address, currentLocation: sellerProfiles.currentLocation, openingTime: sellerProfiles.openingTime, closingTime: sellerProfiles.closingTime, preferredCourierId: sellerProfiles.preferredCourierId, isOpen: sellerProfiles.isOpen, freeShipping: sellerProfiles.freeShipping, verificationStatus: sellerProfiles.verificationStatus, isBanned: sellerProfiles.isBanned, verifiedAt: sellerProfiles.verifiedAt }).from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
+      const rows = await db.select({ id: sellerProfiles.id, shopName: sellerProfiles.shopName, ownerName: sellerProfiles.ownerName, whatsapp: sellerProfiles.whatsapp, avatarUrl: sellerProfiles.avatarUrl, village: sellerProfiles.village, district: sellerProfiles.district, address: sellerProfiles.address, currentLocation: sellerProfiles.currentLocation, openingTime: sellerProfiles.openingTime, closingTime: sellerProfiles.closingTime, preferredCourierId: sellerProfiles.preferredCourierId, isOpen: sellerProfiles.isOpen, freeShipping: sellerProfiles.freeShipping, handlingFeePercent: sellerProfiles.handlingFeePercent, verificationStatus: sellerProfiles.verificationStatus, isBanned: sellerProfiles.isBanned, verifiedAt: sellerProfiles.verifiedAt }).from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1);
       return rows[0] ?? null;
     }),
     setSellerOpen: publicProcedure.input(z.object({ whatsapp: phone, isOpen: z.boolean() })).mutation(async ({ input }) => {
@@ -550,7 +550,7 @@ export const appRouter = router({
       const orderCode = `INV-${Date.now()}`;
       const shipping = await getShippingSettings();
       const productRowsForShipping = input.items.every((item) => item.productId !== undefined)
-        ? await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId, stock: products.stock, isPreOrder: products.isPreOrder, preOrderDays: products.preOrderDays, preOrderActive: products.preOrderActive, freeShipping: sellerProfiles.freeShipping, sellerLocation: sellerProfiles.currentLocation }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(products.id, item.productId as number)).limit(1)))
+        ? await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId, stock: products.stock, isPreOrder: products.isPreOrder, preOrderDays: products.preOrderDays, preOrderActive: products.preOrderActive, freeShipping: sellerProfiles.freeShipping, handlingFeePercent: sellerProfiles.handlingFeePercent, sellerLocation: sellerProfiles.currentLocation }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(products.id, item.productId as number)).limit(1)))
         : [];
       if (input.items.every((item) => item.productId !== undefined)) {
         input.items.forEach((item, index) => {
@@ -569,7 +569,13 @@ export const appRouter = router({
       const pickupCoordinates = parseCoordinates(pickupLocation);
       const sellerShipping = pickupCoordinates ? { ...shipping, originLatitude: String(pickupCoordinates.latitude), originLongitude: String(pickupCoordinates.longitude) } : shipping;
       const calculatedDelivery = calculateShippingCost(sellerShipping, input.currentLocation, freeShipping, input.routeDistanceKm);
-      const calculatedHandlingFee = Math.round(input.subtotal * (shipping.handlingFeePercent || 0) / 100);
+      const calculatedHandlingFee = productRowsForShipping.length === input.items.length
+        ? Math.round(input.items.reduce((total, item, index) => {
+            const product = productRowsForShipping[index]?.[0];
+            const sellerRate = product?.handlingFeePercent ?? shipping.handlingFeePercent ?? 0;
+            return total + (item.price * item.quantity * sellerRate / 100);
+          }, 0))
+        : Math.round(input.subtotal * (shipping.handlingFeePercent || 0) / 100);
       const calculatedTotal = input.subtotal + calculatedHandlingFee + calculatedDelivery;
       await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp, village: input.village, address: input.address }).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: input.customerName, village: input.village, address: input.address, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.customerName.trim());
@@ -617,6 +623,7 @@ export const appRouter = router({
     updateSupportTicket: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), status: z.enum(["open", "in_progress", "resolved"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return updateSupportTicketStatus(input.id, input.status); }),
     deleteSupportTicket: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive() })).mutation(async ({ input }) => { const admin = await requireAdminSession(input.sessionToken); try { return await deleteSupportTicket(input.id, { name: admin.name, whatsapp: admin.whatsapp }); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Tiket belum dapat dihapus." }); } }),
     couriers: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listCouriers(); }),
+    updateSellerHandlingFee: publicProcedure.input(z.object({ sessionToken: adminSessionToken, id: z.number().int().positive(), handlingFeePercent: z.number().int().min(0).max(100).nullable() })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); return updateSellerHandlingFee(input.id, input.handlingFeePercent); }),
     userDirectory: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return getAdminUserDirectory(); }),
     auditLogs: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listAdminAuditLogs(); }),
     deleteAuditLogs: publicProcedure.input(z.object({ sessionToken: adminSessionToken, ids: z.array(z.number().int().positive()).min(1).max(50) })).mutation(async ({ input }) => { const admin = await requireAdminSession(input.sessionToken); if (!isPermanentAdminWhatsapp(admin.whatsapp)) throw new TRPCError({ code: "FORBIDDEN", message: "Hanya admin permanen yang dapat menghapus riwayat aktivitas Admin." }); return deleteAdminAuditLogs(input.ids, admin.whatsapp); }),
