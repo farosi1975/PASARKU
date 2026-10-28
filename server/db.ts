@@ -41,6 +41,18 @@ const ensureMySqlRuntimeColumns = async () => {
       if (code !== "ER_DUP_FIELDNAME") console.warn(`[Database] Kolom ${column} belum dapat disiapkan:`, error instanceof Error ? error.message : error);
     }
   }
+  for (const [table, column, definition] of [
+    ["products", "isPreOrder", "int NOT NULL DEFAULT 0"],
+    ["products", "preOrderDays", "int NOT NULL DEFAULT 0"],
+    ["products", "preOrderActive", "int NOT NULL DEFAULT 0"],
+    ["orders", "isPreOrder", "int NOT NULL DEFAULT 0"],
+    ["orders", "preOrderDays", "int NOT NULL DEFAULT 0"],
+    ["orders", "preOrderStatus", "varchar(20) NOT NULL DEFAULT 'none'"],
+    ["orders", "preOrderReadyAt", "timestamp NULL"],
+  ] as const) {
+    try { await _mysqlPool.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`); }
+    catch (error) { const code = (error as { code?: string }).code; if (code !== "ER_DUP_FIELDNAME") console.warn(`[Database] Kolom Pre-Order ${table}.${column} belum dapat disiapkan:`, error instanceof Error ? error.message : error); }
+  }
   try { await _mysqlPool.query(`ALTER TABLE courier_profiles ADD COLUMN currentLocation text NULL`); }
   catch (error) {
     const code = (error as { code?: string }).code;
@@ -92,6 +104,13 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referralCode" varchar(24)`);
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referredByCode" varchar(24)`);
         await _pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "buyer_profiles_referralCode_idx" ON "buyer_profiles" ("referralCode")`);
+        await _pool.query(`ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "isPreOrder" integer DEFAULT 0 NOT NULL`);
+        await _pool.query(`ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "preOrderDays" integer DEFAULT 0 NOT NULL`);
+        await _pool.query(`ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "preOrderActive" integer DEFAULT 0 NOT NULL`);
+        await _pool.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "isPreOrder" integer DEFAULT 0 NOT NULL`);
+        await _pool.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "preOrderDays" integer DEFAULT 0 NOT NULL`);
+        await _pool.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "preOrderStatus" varchar(20) DEFAULT 'none' NOT NULL`);
+        await _pool.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "preOrderReadyAt" timestamp`);
         _db = drizzlePostgres(_pool);
       }
       console.info(`[Database] Connected using ${databaseDialect} adapter.`);

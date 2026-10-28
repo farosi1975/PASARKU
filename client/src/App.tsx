@@ -19,6 +19,7 @@ import PwaInstallPrompt from "./components/PwaInstallPrompt";
 import PushPromoPrompt from "./components/PushPromoPrompt";
 import "./push-promo.css";
 import "./guest-checkout.css";
+import "./preorder.css";
 import { trpc } from "./lib/trpc";
 
 function VisitorTracker() {

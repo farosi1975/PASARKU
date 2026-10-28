@@ -6,6 +6,9 @@ export type Product = {
   category: string;
   price: number;
   stock?: number;
+  isPreOrder?: boolean;
+  preOrderDays?: number;
+  preOrderActive?: boolean;
   unit: string;
   accent: string;
   emoji: string;
@@ -46,6 +49,9 @@ export type MockOrder = {
   orderItems?: { name: string; price: number; quantity: number }[];
   payment: "COD" | "Transfer";
   status: OrderStatus;
+  isPreOrder?: boolean;
+  preOrderDays?: number;
+  preOrderStatus?: string;
   time: string;
   courier?: string;
   courierCurrentLocation?: string | null;

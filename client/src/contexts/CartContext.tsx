@@ -21,10 +21,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const value = useMemo<CartContextValue>(() => {
     const addItem = (product: Product) => {
       setItems((current) => {
-        if (product.stock === 0) return current;
+        if ((product.isPreOrder && product.preOrderActive === false) || (!product.isPreOrder && product.stock === 0)) return current;
         const existing = current.find((item) => item.id === product.id);
         if (existing) {
-          const nextQuantity = product.stock === undefined ? existing.quantity + 1 : Math.min(existing.quantity + 1, product.stock);
+          const nextQuantity = product.isPreOrder || product.stock === undefined ? existing.quantity + 1 : Math.min(existing.quantity + 1, product.stock);
           return current.map((item) => item.id === product.id ? { ...item, ...product, quantity: nextQuantity } : item);
         }
         return [...current, { ...product, quantity: 1 }];
@@ -34,7 +34,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const removeItem = (productId: string) => setItems((current) => current.filter((item) => item.id !== productId));
     const updateQuantity = (productId: string, quantity: number) => {
       if (quantity <= 0) return removeItem(productId);
-      setItems((current) => current.map((item) => item.id === productId ? { ...item, quantity: item.stock === undefined ? quantity : Math.min(quantity, item.stock) } : item));
+      setItems((current) => current.map((item) => item.id === productId ? { ...item, quantity: item.isPreOrder || item.stock === undefined ? quantity : Math.min(quantity, item.stock) } : item));
     };
     const clearCart = () => setItems([]);
 

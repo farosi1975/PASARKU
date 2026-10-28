@@ -18,8 +18,8 @@ const phone = z.string().min(10).max(32);
 const dbRequired = async () => { const db = await getDb(); if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database belum tersedia." }); return db; };
 const affectedRows = (result: unknown) => Number((result as any)?.rowCount ?? (result as any)?.[0]?.affectedRows ?? 0);
 const deductStockForConfirmedOrder = async (tx: any, orderCode: string) => {
-  const current = await tx.select({ id: orders.id, status: orders.status, stockDeductedAt: orders.stockDeductedAt }).from(orders).where(eq(orders.orderCode, orderCode)).limit(1);
-  if (!current[0] || current[0].status !== "Diproses" || current[0].stockDeductedAt) return { deducted: false };
+  const current = await tx.select({ id: orders.id, status: orders.status, stockDeductedAt: orders.stockDeductedAt, isPreOrder: orders.isPreOrder }).from(orders).where(eq(orders.orderCode, orderCode)).limit(1);
+  if (!current[0] || current[0].status !== "Diproses" || current[0].stockDeductedAt || current[0].isPreOrder) return { deducted: false };
   const claimed = await tx.update(orders).set({ stockDeductedAt: new Date(), updatedAt: new Date() }).where(and(eq(orders.id, current[0].id), eq(orders.status, "Diproses"), isNull(orders.stockDeductedAt)));
   if (!affectedRows(claimed)) return { deducted: false };
   const items = await tx.select({ productId: orderItems.productId, quantity: orderItems.quantity, productName: orderItems.productName }).from(orderItems).where(eq(orderItems.orderId, current[0].id));
@@ -213,7 +213,7 @@ const formatCourierDeliveryDetails = (invoice: InvoiceNotification) => {
   return ["Detail pengantaran:", `Alamat: ${invoice.deliveryAddress || "Belum diisi"}`, invoice.buyerNote ? `Pesan pembeli: ${invoice.buyerNote}` : "Pesan pembeli: Tidak ada", navigationUrl ? `Navigasi: ${navigationUrl}` : "Navigasi: Lokasi belum tersedia"].join("\n");
 };
 
-const notifyCourierAssignment = async (target: string, orderCode: string, total: number, source: "otomatis" | "Admin", invoice: InvoiceNotification) => {
+const notifyCourierAssignment = async (target: string, orderCode: string, total: number, source: "otomatis" | "Admin" | "Pre-Order siap dari penjual", invoice: InvoiceNotification) => {
   const message = `PASARKU: Pesanan ${orderCode} telah ditugaskan ${source === "otomatis" ? "secara otomatis berdasarkan pilihan toko" : "oleh Admin"} kepada Anda. Buka portal kurir untuk menerima dan mengantar tugas.\n\n${formatInvoiceNotification(invoice)}\n\n${formatCourierDeliveryDetails(invoice)}\n\nBuka PWA PASARKU: ${PASARKU_WEB_URL}`;
   try {
     await sendFonnteMessage(target, message);
@@ -459,20 +459,20 @@ export const appRouter = router({
       await upsertAccountRole(whatsapp, "seller", input.ownerName.trim());
       const rows = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1); return rows[0];
     }),
-    createProduct: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2), category: z.string().min(2), price: z.number().int().positive(), stock: z.number().int().nonnegative(), imageData: z.string().optional() })).mutation(async ({ input }) => {
+    createProduct: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().min(2), category: z.string().min(2), price: z.number().int().positive(), stock: z.number().int().nonnegative(), imageData: z.string().optional(), isPreOrder: z.boolean().optional(), preOrderDays: z.number().int().min(1).max(5).optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, normalizePhone(input.whatsapp))).limit(1); if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual masih menunggu verifikasi manual Admin." });
       const imageUrl = await uploadProductImage(normalizePhone(input.whatsapp), input.imageData);
-      const result = await db.insert(products).values({ sellerId: seller[0].id, name: input.name, category: input.category, price: input.price, stock: input.stock, imageUrl, vendor: seller[0].shopName, location: seller[0].village, status: "approved" });
-      return { id: Number((result as any)[0]?.insertId ?? 0), imageUrl, status: "approved" as const };
+      const result = await db.insert(products).values({ sellerId: seller[0].id, name: input.name, category: input.category, price: input.price, stock: input.stock, imageUrl, vendor: seller[0].shopName, location: seller[0].village, status: "approved", isPreOrder: input.isPreOrder ? 1 : 0, preOrderDays: input.isPreOrder ? input.preOrderDays || 1 : 0, preOrderActive: input.isPreOrder ? 1 : 0 });
+      return { id: Number((result as any)[0]?.insertId ?? 0), imageUrl, status: "approved" as const, isPreOrder: Boolean(input.isPreOrder), preOrderDays: input.isPreOrder ? input.preOrderDays || 1 : 0 };
     }),
-    updateProduct: publicProcedure.input(z.object({ whatsapp: phone, productId: z.number().int().positive(), name: z.string().min(2), category: z.string().min(2), price: z.number().int().positive(), stock: z.number().int().nonnegative(), imageData: z.string().optional() })).mutation(async ({ input }) => {
+    updateProduct: publicProcedure.input(z.object({ whatsapp: phone, productId: z.number().int().positive(), name: z.string().min(2), category: z.string().min(2), price: z.number().int().positive(), stock: z.number().int().nonnegative(), imageData: z.string().optional(), isPreOrder: z.boolean().optional(), preOrderDays: z.number().int().min(1).max(5).optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp);
       const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1);
       if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual belum terverifikasi." });
       const product = await db.select().from(products).where(and(eq(products.id, input.productId), eq(products.sellerId, seller[0].id))).limit(1);
       if (!product[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Produk tidak ditemukan di toko Anda." });
       const imageUrl = input.imageData ? await uploadProductImage(whatsapp, input.imageData) : product[0].imageUrl;
-      await db.update(products).set({ name: input.name.trim(), category: input.category, price: input.price, stock: input.stock, imageUrl, vendor: seller[0].shopName, location: seller[0].village, updatedAt: new Date() }).where(eq(products.id, input.productId));
+      await db.update(products).set({ name: input.name.trim(), category: input.category, price: input.price, stock: input.stock, imageUrl, vendor: seller[0].shopName, location: seller[0].village, isPreOrder: input.isPreOrder ? 1 : 0, preOrderDays: input.isPreOrder ? input.preOrderDays || 1 : 0, preOrderActive: input.isPreOrder ? 1 : 0, updatedAt: new Date() }).where(eq(products.id, input.productId));
       const rows = await db.select().from(products).where(eq(products.id, input.productId)).limit(1);
       return rows[0];
     }),
@@ -484,6 +484,32 @@ export const appRouter = router({
       if (!product[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Produk tidak ditemukan di toko Anda." });
       await db.delete(products).where(eq(products.id, input.productId));
       return { success: true as const, productId: input.productId };
+    }),
+    markPreOrderReady: publicProcedure.input(z.object({ whatsapp: phone, orderCode: z.string().min(3) })).mutation(async ({ input }) => {
+      const db = await dbRequired();
+      const whatsapp = normalizePhone(input.whatsapp);
+      const seller = await db.select().from(sellerProfiles).where(eq(sellerProfiles.whatsapp, whatsapp)).limit(1);
+      if (!seller[0] || seller[0].verificationStatus !== "verified" || seller[0].isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Profil penjual belum terverifikasi." });
+      const rows = await db.select({ order: orders, productSellerId: products.sellerId }).from(orders).innerJoin(orderItems, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id)).where(and(eq(orders.orderCode, input.orderCode), eq(products.sellerId, seller[0].id))).limit(1);
+      const order = rows[0]?.order;
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Pre-Order tidak ditemukan di toko Anda." });
+      if (!order.isPreOrder) throw new TRPCError({ code: "BAD_REQUEST", message: "Pesanan ini bukan Pre-Order." });
+      if (order.preOrderStatus === "siap") return { success: true as const, orderCode: order.orderCode, status: "siap" as const, courierAssigned: Boolean(order.courierId) };
+      const readyAt = new Date();
+      await db.update(orders).set({ preOrderStatus: "siap", preOrderReadyAt: readyAt, updatedAt: readyAt }).where(eq(orders.id, order.id));
+      const preferredCourierId = seller[0].preferredCourierId;
+      let courierAssigned = false;
+      if (preferredCourierId) {
+        const courier = await db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp }).from(courierProfiles).where(and(eq(courierProfiles.id, preferredCourierId), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1);
+        if (courier[0]) {
+          const items = await db.select({ productName: orderItems.productName, price: orderItems.price, quantity: orderItems.quantity }).from(orderItems).where(eq(orderItems.orderId, order.id));
+          const invoice = { items, subtotal: order.subtotal, delivery: order.delivery, handlingFee: order.handlingFee, total: order.total, deliveryAddress: `${order.address}, Desa ${order.village}`, buyerNote: order.note, buyerLocation: order.currentLocation };
+          await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null, updatedAt: new Date() }).where(eq(orders.id, order.id));
+          void notifyCourierAssignment(courier[0].whatsapp, order.orderCode, order.total, "Pre-Order siap dari penjual", invoice);
+          courierAssigned = true;
+        }
+      }
+      return { success: true as const, orderCode: order.orderCode, status: "siap" as const, courierAssigned };
     }),
     requestCourierOtp: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, vehicle: z.string().min(2), district: z.string().min(2).max(80).default("Sawahan") })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp); beginOtpSend("courier", whatsapp); const otp = String(randomInt(100000, 1000000));
@@ -524,15 +550,20 @@ export const appRouter = router({
       const orderCode = `INV-${Date.now()}`;
       const shipping = await getShippingSettings();
       const productRowsForShipping = input.items.every((item) => item.productId !== undefined)
-        ? await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId, stock: products.stock, freeShipping: sellerProfiles.freeShipping, sellerLocation: sellerProfiles.currentLocation }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(products.id, item.productId as number)).limit(1)))
+        ? await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId, stock: products.stock, isPreOrder: products.isPreOrder, preOrderDays: products.preOrderDays, preOrderActive: products.preOrderActive, freeShipping: sellerProfiles.freeShipping, sellerLocation: sellerProfiles.currentLocation }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(products.id, item.productId as number)).limit(1)))
         : [];
       if (input.items.every((item) => item.productId !== undefined)) {
         input.items.forEach((item, index) => {
           const product = productRowsForShipping[index]?.[0];
           if (!product) throw new TRPCError({ code: "NOT_FOUND", message: `Produk ${item.productName} tidak ditemukan.` });
-          if (product.stock < item.quantity) throw new TRPCError({ code: "CONFLICT", message: `Stok ${item.productName} habis atau tidak mencukupi.` });
+          if (product.isPreOrder === 1 && product.preOrderActive !== 1) throw new TRPCError({ code: "CONFLICT", message: `Pre-Order ${item.productName} sedang tidak menerima pesanan baru.` });
+          if (product.isPreOrder !== 1 && product.stock < item.quantity) throw new TRPCError({ code: "CONFLICT", message: `Stok ${item.productName} habis atau tidak mencukupi.` });
         });
       }
+      const orderIsPreOrder = productRowsForShipping.length === input.items.length && productRowsForShipping.every((rows) => rows[0]?.isPreOrder === 1);
+      const orderPreOrderDays = orderIsPreOrder ? Math.max(...productRowsForShipping.map((rows) => rows[0]?.preOrderDays || 1)) : 0;
+      const orderModes = productRowsForShipping.length === input.items.length ? new Set(productRowsForShipping.map((rows) => rows[0]?.isPreOrder === 1)) : new Set<boolean>();
+      if (orderModes.size > 1) throw new TRPCError({ code: "BAD_REQUEST", message: "Produk biasa dan Pre-Order harus dibuat dalam checkout terpisah." });
       const freeShipping = productRowsForShipping.length === input.items.length && productRowsForShipping.every((rows) => rows[0]?.freeShipping === 1);
       const pickupLocation = productRowsForShipping.length === input.items.length && productRowsForShipping.every((rows) => rows[0]) && new Set(productRowsForShipping.map((rows) => rows[0]?.sellerLocation || "")).size === 1 ? productRowsForShipping[0]?.[0]?.sellerLocation || null : null;
       const pickupCoordinates = parseCoordinates(pickupLocation);
@@ -542,14 +573,14 @@ export const appRouter = router({
       const calculatedTotal = input.subtotal + calculatedHandlingFee + calculatedDelivery;
       await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp, village: input.village, address: input.address }).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: input.customerName, village: input.village, address: input.address, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.customerName.trim());
-      await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, currentLocation: input.currentLocation || null, pickupLocation, routeDistanceKm: input.routeDistanceKm ? Math.round(input.routeDistanceKm * 10) : null, note: input.note, subtotal: input.subtotal, handlingFee: calculatedHandlingFee, delivery: calculatedDelivery, total: calculatedTotal, payment: input.payment, status: "Menunggu" });
+      await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, currentLocation: input.currentLocation || null, pickupLocation, routeDistanceKm: input.routeDistanceKm ? Math.round(input.routeDistanceKm * 10) : null, note: input.note, subtotal: input.subtotal, handlingFee: calculatedHandlingFee, delivery: calculatedDelivery, total: calculatedTotal, payment: input.payment, status: "Menunggu", isPreOrder: orderIsPreOrder ? 1 : 0, preOrderDays: orderPreOrderDays, preOrderStatus: orderIsPreOrder ? "menunggu" : "none" });
       const insertedOrder = await db.select({ id: orders.id }).from(orders).where(eq(orders.orderCode, orderCode)).limit(1);
       const orderId = insertedOrder[0]?.id;
       if (!orderId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Pesanan tersimpan tetapi ID pesanan tidak dapat dibaca." });
       await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity })));
       let assignedCourier: { whatsapp: string; name: string } | null = null;
       const hasProductIds = input.items.every((item) => item.productId !== undefined);
-      if (hasProductIds) {
+      if (hasProductIds && !orderIsPreOrder) {
         const productRows = await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId }).from(products).where(eq(products.id, item.productId as number)).limit(1)));
         const sellerIds = Array.from(new Set(productRows.map((rows) => rows[0]?.sellerId).filter((id): id is number => id !== null && id !== undefined)));
         if (sellerIds.length === 1 && productRows.every((rows) => rows[0])) {
@@ -670,8 +701,9 @@ export const appRouter = router({
       await requireAdminSession(input.sessionToken); const db = await dbRequired();
       const courier = await db.select().from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1);
       if (!courier[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Kurir belum terverifikasi atau sedang diblokir." });
-      const order = await db.select({ id: orders.id, subtotal: orders.subtotal, delivery: orders.delivery, handlingFee: orders.handlingFee, total: orders.total, address: orders.address, village: orders.village, note: orders.note, currentLocation: orders.currentLocation }).from(orders).where(eq(orders.orderCode, input.orderCode)).limit(1);
+      const order = await db.select({ id: orders.id, subtotal: orders.subtotal, delivery: orders.delivery, handlingFee: orders.handlingFee, total: orders.total, address: orders.address, village: orders.village, note: orders.note, currentLocation: orders.currentLocation, isPreOrder: orders.isPreOrder, preOrderStatus: orders.preOrderStatus }).from(orders).where(eq(orders.orderCode, input.orderCode)).limit(1);
       if (!order[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Pesanan tidak ditemukan." });
+      if (order[0].isPreOrder && order[0].preOrderStatus !== "siap") throw new TRPCError({ code: "CONFLICT", message: "Pre-Order belum ditandai siap oleh penjual." });
       const invoiceItems = await db.select({ productName: orderItems.productName, price: orderItems.price, quantity: orderItems.quantity }).from(orderItems).where(eq(orderItems.orderId, order[0].id));
       const invoice = { items: invoiceItems, subtotal: order[0].subtotal, delivery: order[0].delivery, handlingFee: order[0].handlingFee, total: order[0].total, deliveryAddress: `${order[0].address}, Desa ${order[0].village}`, buyerNote: order[0].note, buyerLocation: order[0].currentLocation };
       await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null }).where(eq(orders.orderCode, input.orderCode));
@@ -695,6 +727,7 @@ export const appRouter = router({
       if (!courier[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Kurir belum terverifikasi atau sedang diblokir." });
       const order = await db.select().from(orders).where(and(eq(orders.orderCode, input.orderCode), eq(orders.courierId, courier[0].id))).limit(1);
       if (!order[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Tugas tidak ditemukan untuk kurir ini." });
+      if (order[0].isPreOrder && order[0].preOrderStatus !== "siap") throw new TRPCError({ code: "CONFLICT", message: "Pre-Order belum siap dari penjual." });
       if (order[0].status !== "Menunggu") throw new TRPCError({ code: "CONFLICT", message: "Tugas ini sudah diterima atau sudah diproses." });
       await db.update(orders).set({ status: "Diproses", courierAcceptedAt: new Date() }).where(eq(orders.id, order[0].id));
       return { success: true as const, orderCode: input.orderCode, status: "Diproses" as const };

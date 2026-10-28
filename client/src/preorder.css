@@ -1,0 +1,51 @@
+.preorder-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #b45309;
+  font-weight: 700;
+}
+
+.preorder-checkout-button {
+  margin-top: 8px;
+  background: #b45309;
+}
+
+.seller-preorder-toggle {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid #f2c38a;
+  border-radius: 14px;
+  background: #fff8ed;
+}
+
+.seller-preorder-toggle span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.seller-preorder-toggle input { accent-color: #b45309; }
+.seller-preorder-toggle small { color: #8a6a4a; }
+.seller-preorder-ready {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #b45309;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.seller-preorder-ready:disabled { opacity: .6; cursor: wait; }
+.preorder-ready-label {
+  color: #047857;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .seller-preorder-ready { width: 100%; }
+}
