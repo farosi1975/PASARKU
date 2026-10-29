@@ -29,7 +29,19 @@ function Header({ onCart, logoUrl, brandName }: { onCart: () => void; logoUrl?: 
   const [userName, setUserName] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
+  const [cartBump, setCartBump] = useState(false);
+  const previousCartCount = useRef(count);
   useEffect(() => setLogoFailed(false), [logoUrl]);
+  useEffect(() => {
+    if (count > previousCartCount.current) {
+      setCartBump(true);
+      const timer = window.setTimeout(() => setCartBump(false), 520);
+      previousCartCount.current = count;
+      return () => window.clearTimeout(timer);
+    }
+    previousCartCount.current = count;
+    return undefined;
+  }, [count]);
   useEffect(() => {
     const loadUser = () => { try {
       const session = JSON.parse(window.localStorage.getItem(USER_SESSION_KEY) || "null") as { name?: string } | null;
@@ -63,9 +75,9 @@ function Header({ onCart, logoUrl, brandName }: { onCart: () => void; logoUrl?: 
           <HelpAdminButton compact context="pertanyaan dari katalog PASARKU" />
         </nav>
         <div className="header-actions">
-          <button className="icon-button cart-trigger" onClick={onCart} aria-label="Buka keranjang">
+          <button className={`icon-button cart-trigger ${cartBump ? "cart-bump" : ""}`} onClick={onCart} aria-label="Buka keranjang">
             <ShoppingCart size={18} />
-            {count > 0 && <span className="cart-count">{count}</span>}
+            {count > 0 && <span className={`cart-count ${cartBump ? "cart-count-pop" : ""}`} aria-live="polite">{count}</span>}
           </button>
           {userName ? <div className="profile-menu"><button className="profile-trigger" onClick={() => setProfileOpen((current) => !current)} aria-expanded={profileOpen}><span className="profile-avatar">{userName.charAt(0).toUpperCase()}</span><span className="profile-name">{userName}</span><ChevronDown size={14} /></button>{profileOpen && <div className="profile-dropdown"><div className="profile-dropdown-heading"><span className="profile-avatar large">{userName.charAt(0).toUpperCase()}</span><div><strong>{userName}</strong><small>Pengguna PASARKU</small></div></div><Link href="/profil" className="profile-item" onClick={() => setProfileOpen(false)}><UserRound size={15} /> Profil pengguna</Link><Link href="/profil" className="profile-item" onClick={() => setProfileOpen(false)}><Settings size={15} /> Pengaturan</Link><div className="profile-divider"></div><button className="profile-item danger" onClick={logout}><LogOutIcon /> Keluar</button></div>}</div> : <Link href="/masuk" className="login-button">Masuk</Link>}
         </div>
