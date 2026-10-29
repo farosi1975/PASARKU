@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, Check, ChevronDown, Clock3, MapPin, MessageCircle, Minus, PackageCheck, Plus, RefreshCw, Search, Settings, ShoppingBag, SlidersHorizontal, Sparkles, Truck, Trash2, UserRound, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Clock3, MapPin, MessageCircle, Minus, PackageCheck, Plus, RefreshCw, Search, Settings, ShoppingCart, SlidersHorizontal, Sparkles, Truck, Trash2, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { categories, formatRupiah, type Product } from "@/data/catalog";
 import { useCart } from "@/contexts/CartContext";
@@ -64,7 +64,7 @@ function Header({ onCart, logoUrl, brandName }: { onCart: () => void; logoUrl?: 
         </nav>
         <div className="header-actions">
           <button className="icon-button cart-trigger" onClick={onCart} aria-label="Buka keranjang">
-            <ShoppingBag size={18} />
+            <ShoppingCart size={18} />
             {count > 0 && <span className="cart-count">{count}</span>}
           </button>
           {userName ? <div className="profile-menu"><button className="profile-trigger" onClick={() => setProfileOpen((current) => !current)} aria-expanded={profileOpen}><span className="profile-avatar">{userName.charAt(0).toUpperCase()}</span><span className="profile-name">{userName}</span><ChevronDown size={14} /></button>{profileOpen && <div className="profile-dropdown"><div className="profile-dropdown-heading"><span className="profile-avatar large">{userName.charAt(0).toUpperCase()}</span><div><strong>{userName}</strong><small>Pengguna PASARKU</small></div></div><Link href="/profil" className="profile-item" onClick={() => setProfileOpen(false)}><UserRound size={15} /> Profil pengguna</Link><Link href="/profil" className="profile-item" onClick={() => setProfileOpen(false)}><Settings size={15} /> Pengaturan</Link><div className="profile-divider"></div><button className="profile-item danger" onClick={logout}><LogOutIcon /> Keluar</button></div>}</div> : <Link href="/masuk" className="login-button">Masuk</Link>}
@@ -112,7 +112,7 @@ function CartDrawer({ open, onClose, onCheckout }: { open: boolean; onClose: () 
       <aside className="cart-drawer" aria-label="Keranjang belanja">
         <div className="drawer-heading"><div><span className="eyebrow">Pesanan Anda</span><h2>Keranjang</h2></div><button className="close-button" onClick={onClose}><X size={20} /></button></div>
         {items.length === 0 ? (
-          <div className="empty-cart"><div className="empty-icon"><ShoppingBag size={24} /></div><h3>Keranjang masih kosong</h3><p>Temukan kebutuhan warga Sawahan di katalog.</p><button className="primary-button" onClick={onClose}>Mulai belanja</button></div>
+          <div className="empty-cart"><div className="empty-icon"><ShoppingCart size={24} /></div><h3>Keranjang masih kosong</h3><p>Temukan kebutuhan warga Sawahan di katalog.</p><button className="primary-button" onClick={onClose}>Mulai belanja</button></div>
         ) : (
           <>
             <div className="cart-items">
