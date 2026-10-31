@@ -243,10 +243,26 @@ export const orders = mysqlTable("orders", {
   preOrderReadyAt: timestamp("preOrderReadyAt"),
   courierId: int("courierId"),
   courierAcceptedAt: timestamp("courierAcceptedAt"),
+  courierResponseStatus: varchar("courierResponseStatus", { length: 20 }).default("not_assigned").notNull(),
+  courierResponseDeadline: timestamp("courierResponseDeadline"),
+  courierReminderSentAt: timestamp("courierReminderSentAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   stockDeductedAt: timestamp("stockDeductedAt"),
   stockRestoredAt: timestamp("stockRestoredAt"),
+});
+
+export const orderCourierAttempts = mysqlTable("order_courier_attempts", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull(),
+  courierId: int("courierId").notNull(),
+  status: varchar("status", { length: 20 }).default("assigned").notNull(),
+  reason: varchar("reason", { length: 80 }),
+  note: text("note"),
+  assignedAt: timestamp("assignedAt").defaultNow().notNull(),
+  reminderSentAt: timestamp("reminderSentAt"),
+  respondedAt: timestamp("respondedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export const orderItems = mysqlTable("order_items", {

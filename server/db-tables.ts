@@ -24,6 +24,7 @@ export const {
   adminAuditLogs,
   products,
   orders,
+  orderCourierAttempts,
   orderItems,
   taxCashEntries,
   pushSubscriptions,
