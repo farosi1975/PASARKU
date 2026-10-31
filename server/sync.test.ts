@@ -31,6 +31,11 @@ describe("marketplace synchronization API", () => {
     await expect(caller.marketplace.updateOrderStatus({ orderCode: "INV-TEST", status: "INVALID" as never })).rejects.toThrow();
   });
 
+  it("requires courier identity before changing a remote order status", async () => {
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.marketplace.updateOrderStatus({ orderCode: "INV-TEST", status: "Diantar" } as never)).rejects.toThrow();
+  });
+
   it("returns a safe empty result for an unknown order", async () => {
     const caller = appRouter.createCaller(createContext());
     const result = await caller.marketplace.order({ orderCode: "INV-NOT-FOUND" });
@@ -45,5 +50,10 @@ describe("marketplace synchronization API", () => {
   it("rejects delivery confirmation without a valid order code", async () => {
     const caller = appRouter.createCaller(createContext());
     await expect(caller.marketplace.confirmDelivery({ orderCode: "" })).rejects.toThrow();
+  });
+
+  it("requires courier identity before confirming delivery", async () => {
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.marketplace.confirmDelivery({ orderCode: "INV-TEST" } as never)).rejects.toThrow();
   });
 });

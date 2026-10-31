@@ -550,7 +550,7 @@ export const appRouter = router({
       const orderCode = `INV-${Date.now()}`;
       const shipping = await getShippingSettings();
       const productRowsForShipping = input.items.every((item) => item.productId !== undefined)
-        ? await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId, stock: products.stock, isPreOrder: products.isPreOrder, preOrderDays: products.preOrderDays, preOrderActive: products.preOrderActive, freeShipping: sellerProfiles.freeShipping, handlingFeePercent: sellerProfiles.handlingFeePercent, sellerLocation: sellerProfiles.currentLocation }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(products.id, item.productId as number)).limit(1)))
+        ? await Promise.all(input.items.map((item) => db.select({ sellerId: products.sellerId, name: products.name, price: products.price, stock: products.stock, isPreOrder: products.isPreOrder, preOrderDays: products.preOrderDays, preOrderActive: products.preOrderActive, freeShipping: sellerProfiles.freeShipping, handlingFeePercent: sellerProfiles.handlingFeePercent, sellerLocation: sellerProfiles.currentLocation }).from(products).leftJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(eq(products.id, item.productId as number)).limit(1)))
         : [];
       if (input.items.every((item) => item.productId !== undefined)) {
         input.items.forEach((item, index) => {
@@ -560,6 +560,10 @@ export const appRouter = router({
           if (product.isPreOrder !== 1 && product.stock < item.quantity) throw new TRPCError({ code: "CONFLICT", message: `Stok ${item.productName} habis atau tidak mencukupi.` });
         });
       }
+      const canonicalItems = productRowsForShipping.length === input.items.length
+        ? input.items.map((item, index) => ({ ...item, productName: productRowsForShipping[index]?.[0]?.name ?? item.productName, price: productRowsForShipping[index]?.[0]?.price ?? item.price }))
+        : input.items;
+      const calculatedSubtotal = canonicalItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
       const orderIsPreOrder = productRowsForShipping.length === input.items.length && productRowsForShipping.every((rows) => rows[0]?.isPreOrder === 1);
       const orderPreOrderDays = orderIsPreOrder ? Math.max(...productRowsForShipping.map((rows) => rows[0]?.preOrderDays || 1)) : 0;
       const orderModes = productRowsForShipping.length === input.items.length ? new Set(productRowsForShipping.map((rows) => rows[0]?.isPreOrder === 1)) : new Set<boolean>();
@@ -570,20 +574,20 @@ export const appRouter = router({
       const sellerShipping = pickupCoordinates ? { ...shipping, originLatitude: String(pickupCoordinates.latitude), originLongitude: String(pickupCoordinates.longitude) } : shipping;
       const calculatedDelivery = calculateShippingCost(sellerShipping, input.currentLocation, freeShipping, input.routeDistanceKm);
       const calculatedHandlingFee = productRowsForShipping.length === input.items.length
-        ? Math.round(input.items.reduce((total, item, index) => {
+        ? Math.round(canonicalItems.reduce((total, item, index) => {
             const product = productRowsForShipping[index]?.[0];
             const sellerRate = product?.handlingFeePercent ?? shipping.handlingFeePercent ?? 0;
             return total + (item.price * item.quantity * sellerRate / 100);
           }, 0))
-        : Math.round(input.subtotal * (shipping.handlingFeePercent || 0) / 100);
-      const calculatedTotal = input.subtotal + calculatedHandlingFee + calculatedDelivery;
+        : Math.round(calculatedSubtotal * (shipping.handlingFeePercent || 0) / 100);
+      const calculatedTotal = calculatedSubtotal + calculatedHandlingFee + calculatedDelivery;
       await db.insert(buyerProfiles).values({ name: input.customerName, whatsapp, village: input.village, address: input.address }).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: input.customerName, village: input.village, address: input.address, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.customerName.trim());
-      await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, currentLocation: input.currentLocation || null, pickupLocation, routeDistanceKm: input.routeDistanceKm ? Math.round(input.routeDistanceKm * 10) : null, note: input.note, subtotal: input.subtotal, handlingFee: calculatedHandlingFee, delivery: calculatedDelivery, total: calculatedTotal, payment: input.payment, status: "Menunggu", isPreOrder: orderIsPreOrder ? 1 : 0, preOrderDays: orderPreOrderDays, preOrderStatus: orderIsPreOrder ? "menunggu" : "none" });
+      await db.insert(orders).values({ orderCode, customerName: input.customerName, whatsapp, village: input.village, address: input.address, currentLocation: input.currentLocation || null, pickupLocation, routeDistanceKm: input.routeDistanceKm ? Math.round(input.routeDistanceKm * 10) : null, note: input.note, subtotal: calculatedSubtotal, handlingFee: calculatedHandlingFee, delivery: calculatedDelivery, total: calculatedTotal, payment: input.payment, status: "Menunggu", isPreOrder: orderIsPreOrder ? 1 : 0, preOrderDays: orderPreOrderDays, preOrderStatus: orderIsPreOrder ? "menunggu" : "none" });
       const insertedOrder = await db.select({ id: orders.id }).from(orders).where(eq(orders.orderCode, orderCode)).limit(1);
       const orderId = insertedOrder[0]?.id;
       if (!orderId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Pesanan tersimpan tetapi ID pesanan tidak dapat dibaca." });
-      await db.insert(orderItems).values(input.items.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity })));
+      await db.insert(orderItems).values(canonicalItems.map(item => ({ orderId, productId: item.productId, productName: item.productName, price: item.price, quantity: item.quantity })));
       let assignedCourier: { whatsapp: string; name: string } | null = null;
       const hasProductIds = input.items.every((item) => item.productId !== undefined);
       if (hasProductIds && !orderIsPreOrder) {
@@ -601,7 +605,7 @@ export const appRouter = router({
           }
         }
       }
-      const invoice = { items: input.items, subtotal: input.subtotal, delivery: calculatedDelivery, handlingFee: calculatedHandlingFee, total: calculatedTotal, deliveryAddress: `${input.address}, Desa ${input.village}`, buyerNote: input.note || null, buyerLocation: input.currentLocation || null };
+      const invoice = { items: canonicalItems, subtotal: calculatedSubtotal, delivery: calculatedDelivery, handlingFee: calculatedHandlingFee, total: calculatedTotal, deliveryAddress: `${input.address}, Desa ${input.village}`, buyerNote: input.note || null, buyerLocation: input.currentLocation || null };
       const adminSettings = await getShippingSettings();
       void notifyAdminNewOrder(adminSettings.adminWhatsapp, orderCode, input.customerName, input.village, calculatedTotal, invoice);
       if (assignedCourier) void notifyCourierAssignment(assignedCourier.whatsapp, orderCode, calculatedTotal, "otomatis", invoice);
@@ -754,9 +758,9 @@ export const appRouter = router({
       void notifySellerOrderCancelled(db, input.orderCode);
       return getOrderWithItems(input.orderCode);
     }),
-    updateOrderStatus: publicProcedure.input(z.object({ orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { const db = await dbRequired(); if (input.status === "Diproses" || input.status === "Dibatalkan") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); if (input.status === "Diproses") await deductStockForConfirmedOrder(tx, input.orderCode); else await restoreStockForCancelledOrder(tx, input.orderCode); }); if (input.status === "Dibatalkan") void notifySellerOrderCancelled(db, input.orderCode); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); } return getOrderWithItems(input.orderCode); }),
+    updateOrderStatus: publicProcedure.input(z.object({ whatsapp: phone, orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { const db = await dbRequired(); const courier = await db.select({ id: courierProfiles.id }).from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1); if (!courier[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Kurir belum terverifikasi atau sedang diblokir." }); const order = await db.select({ id: orders.id, courierId: orders.courierId, status: orders.status }).from(orders).where(eq(orders.orderCode, input.orderCode)).limit(1); if (!order[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Pesanan tidak ditemukan." }); if (order[0].courierId !== courier[0].id) throw new TRPCError({ code: "FORBIDDEN", message: "Pesanan ini bukan tugas kurir tersebut." }); if (!["Diantar", "Dibatalkan"].includes(input.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "Kurir hanya dapat memperbarui status menjadi Diantar atau Dibatalkan." }); if (input.status === "Dibatalkan") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(and(eq(orders.id, order[0].id), eq(orders.courierId, courier[0].id))); await restoreStockForCancelledOrder(tx, input.orderCode); }); void notifySellerOrderCancelled(db, input.orderCode); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(and(eq(orders.id, order[0].id), eq(orders.courierId, courier[0].id))); } return getOrderWithItems(input.orderCode); }),
     updateAdminOrderStatus: publicProcedure.input(z.object({ sessionToken: adminSessionToken, orderCode: z.string(), status: z.enum(["Menunggu", "Diproses", "Diantar", "Selesai", "Dibatalkan"]) })).mutation(async ({ input }) => { await requireAdminSession(input.sessionToken); const db = await dbRequired(); if (input.status === "Diproses" || input.status === "Dibatalkan") { await db.transaction(async (tx: any) => { await tx.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); if (input.status === "Diproses") await deductStockForConfirmedOrder(tx, input.orderCode); else await restoreStockForCancelledOrder(tx, input.orderCode); }); if (input.status === "Dibatalkan") void notifySellerOrderCancelled(db, input.orderCode); } else { await db.update(orders).set({ status: input.status, updatedAt: new Date() }).where(eq(orders.orderCode, input.orderCode)); } return getOrderWithItems(input.orderCode); }),
-    confirmDelivery: publicProcedure.input(z.object({ orderCode: z.string().min(3) })).mutation(async ({ input }) => { const db = await dbRequired(); await db.update(orders).set({ status: "Selesai" }).where(eq(orders.orderCode, input.orderCode)); return getOrderWithItems(input.orderCode); }),
+    confirmDelivery: publicProcedure.input(z.object({ whatsapp: phone, orderCode: z.string().min(3) })).mutation(async ({ input }) => { const db = await dbRequired(); const courier = await db.select({ id: courierProfiles.id }).from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1); if (!courier[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Kurir belum terverifikasi atau sedang diblokir." }); const order = await db.select({ id: orders.id, courierId: orders.courierId, status: orders.status }).from(orders).where(eq(orders.orderCode, input.orderCode)).limit(1); if (!order[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Pesanan tidak ditemukan." }); if (order[0].courierId !== courier[0].id) throw new TRPCError({ code: "FORBIDDEN", message: "Pesanan ini bukan tugas kurir tersebut." }); if (order[0].status !== "Diantar") throw new TRPCError({ code: "CONFLICT", message: "Pesanan harus berstatus Diantar sebelum dikonfirmasi selesai." }); await db.update(orders).set({ status: "Selesai", updatedAt: new Date() }).where(and(eq(orders.id, order[0].id), eq(orders.courierId, courier[0].id))); return getOrderWithItems(input.orderCode); }),
   }),
 });
 

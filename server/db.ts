@@ -34,6 +34,7 @@ const wrapMySqlDatabase = (database: any): CompatibleDatabase => new Proxy(datab
 }) as CompatibleDatabase;
 const ensureMySqlRuntimeColumns = async () => {
   if (!_mysqlPool) return;
+  if (process.env.ENABLE_RUNTIME_SCHEMA_BOOTSTRAP !== "1") return;
   for (const column of ["stockDeductedAt", "stockRestoredAt"]) {
     try { await _mysqlPool.query(`ALTER TABLE orders ADD COLUMN ${column} timestamp NULL`); }
     catch (error) {
@@ -100,6 +101,7 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         await ensureMySqlRuntimeColumns();
       } else {
         _pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined });
+        if (process.env.ENABLE_RUNTIME_SCHEMA_BOOTSTRAP === "1") {
         await _pool.query(`CREATE TABLE IF NOT EXISTS "push_subscriptions" ("id" serial PRIMARY KEY, "endpoint" text NOT NULL UNIQUE, "p256dh" text NOT NULL, "auth" text NOT NULL, "userAgent" text, "createdAt" timestamp DEFAULT now() NOT NULL, "updatedAt" timestamp DEFAULT now() NOT NULL)`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "promo_notification_logs" ("id" serial PRIMARY KEY, "slotId" varchar(120) NOT NULL UNIQUE, "sentAt" timestamp DEFAULT now() NOT NULL)`);
         await _pool.query(`CREATE TABLE IF NOT EXISTS "promo_notification_deliveries" ("id" serial PRIMARY KEY, "slotId" varchar(120) NOT NULL, "endpoint" text NOT NULL, "sentAt" timestamp DEFAULT now() NOT NULL, CONSTRAINT "promo_notification_deliveries_slot_endpoint_idx" UNIQUE ("slotId", "endpoint"))`);
@@ -120,6 +122,7 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         await _pool.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "preOrderDays" integer DEFAULT 0 NOT NULL`);
         await _pool.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "preOrderStatus" varchar(20) DEFAULT 'none' NOT NULL`);
         await _pool.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "preOrderReadyAt" timestamp`);
+        }
         _db = drizzlePostgres(_pool);
       }
       console.info(`[Database] Connected using ${databaseDialect} adapter.`);
