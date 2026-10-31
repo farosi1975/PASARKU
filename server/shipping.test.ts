@@ -10,7 +10,7 @@ describe("shipping calculator", () => {
 
   it("uses a minimum one-kilometer estimate without GPS", () => {
     expect(distanceInKm(undefined, DEFAULT_SHIPPING_SETTINGS)).toBe(1);
-    expect(calculateShippingCost({ ...DEFAULT_SHIPPING_SETTINGS, ratePerKm: 3000 }, undefined)).toBe(3000);
+    expect(calculateShippingCost({ ...DEFAULT_SHIPPING_SETTINGS, ratePerKm: 3000, discountPercent: 0 }, undefined)).toBe(3000);
   });
 
   it("applies the Admin percentage discount", () => {

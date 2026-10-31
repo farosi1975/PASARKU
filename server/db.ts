@@ -89,6 +89,9 @@ const ensureMySqlRuntimeColumns = async () => {
 };
 
 export async function getDb(): Promise<CompatibleDatabase | null> {
+  // Unit tests must not depend on an external preview/production database.
+  // Set PASARKU_TEST_DB=1 for an explicit integration-test run.
+  if (process.env.VITEST === "true" && process.env.PASARKU_TEST_DB !== "1") return null;
   if (!_db && process.env.DATABASE_URL) {
     try {
       if (databaseDialect === "mysql") {
