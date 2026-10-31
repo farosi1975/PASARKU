@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { createSupportTicket, findBuyerByReferralCode, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminAuditLogs, deleteAdminProfile, deleteOrder, deleteSupportTicket, saveShippingSettings, updateSellerHandlingFee, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole, savePushSubscription, removePushSubscription, isPermanentAdminWhatsapp, listTaxCashEntries, syncCompletedOrderTaxEntries, createTaxCashEntry, updateTaxCashEntry, deleteTaxCashEntry } from "./db";
-import { adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles } from "./db-tables";
+import { adminProfiles, buyerProfiles, courierProfiles, orderCourierAttempts, orderItems, orders, products, sellerProfiles } from "./db-tables";
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendFonnteMessage } from "./fonnte";
@@ -173,6 +173,13 @@ const notifyVerificationResult = async (target: string, role: "seller" | "courie
     console.error(`[FONNTE] Notifikasi verifikasi ${roleLabel} gagal:`, error instanceof Error ? error.message : error);
     return { sent: false as const, statusText };
   }
+};
+const notifyBuyerCourierChange = async (target: string, orderCode: string, reason: "rejected" | "no_response") => {
+  const message = reason === "rejected"
+    ? `PASARKU: Kurir untuk pesanan ${orderCode} belum dapat melanjutkan tugas. Admin sedang mencari kurir pengganti. Status dapat dipantau di PWA PASARKU.`
+    : `PASARKU: Kurir untuk pesanan ${orderCode} belum merespons dalam batas waktu. Admin sedang mencari kurir pengganti. Status dapat dipantau di PWA PASARKU.`;
+  try { await sendFonnteMessage(target, message); return true; }
+  catch (error) { console.error(`[FONNTE] Notifikasi penugasan ulang ke pembeli gagal:`, error instanceof Error ? error.message : error); return false; }
 };
 const notifySellerOrderCancelled = async (db: any, orderCode: string) => {
   try {
@@ -599,7 +606,9 @@ export const appRouter = router({
           if (preferredCourierId) {
             const courier = await db.select({ id: courierProfiles.id, name: courierProfiles.name, whatsapp: courierProfiles.whatsapp }).from(courierProfiles).where(and(eq(courierProfiles.id, preferredCourierId), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1);
             if (courier[0]) {
-              await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null }).where(eq(orders.id, orderId));
+              const responseDeadline = new Date(Date.now() + 15 * 60 * 1000);
+              await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null, courierResponseStatus: "assigned", courierResponseDeadline: responseDeadline, courierReminderSentAt: null }).where(eq(orders.id, orderId));
+              await db.insert(orderCourierAttempts).values({ orderId, courierId: courier[0].id, status: "assigned", assignedAt: new Date() });
               assignedCourier = { whatsapp: courier[0].whatsapp, name: courier[0].name };
             }
           }
@@ -717,7 +726,9 @@ export const appRouter = router({
       if (order[0].isPreOrder && order[0].preOrderStatus !== "siap") throw new TRPCError({ code: "CONFLICT", message: "Pre-Order belum ditandai siap oleh penjual." });
       const invoiceItems = await db.select({ productName: orderItems.productName, price: orderItems.price, quantity: orderItems.quantity }).from(orderItems).where(eq(orderItems.orderId, order[0].id));
       const invoice = { items: invoiceItems, subtotal: order[0].subtotal, delivery: order[0].delivery, handlingFee: order[0].handlingFee, total: order[0].total, deliveryAddress: `${order[0].address}, Desa ${order[0].village}`, buyerNote: order[0].note, buyerLocation: order[0].currentLocation };
-      await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null }).where(eq(orders.orderCode, input.orderCode));
+      const responseDeadline = new Date(Date.now() + 15 * 60 * 1000);
+      await db.update(orders).set({ courierId: courier[0].id, status: "Menunggu", courierAcceptedAt: null, courierResponseStatus: "assigned", courierResponseDeadline: responseDeadline, courierReminderSentAt: null }).where(eq(orders.orderCode, input.orderCode));
+      await db.insert(orderCourierAttempts).values({ orderId: order[0].id, courierId: courier[0].id, status: "assigned", assignedAt: new Date() });
       const notification = await notifyCourierAssignment(courier[0].whatsapp, input.orderCode, order[0].total, "Admin", invoice);
       return { success: true as const, courier: courier[0], notificationSent: notification.sent };
     }),
@@ -740,8 +751,27 @@ export const appRouter = router({
       if (!order[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Tugas tidak ditemukan untuk kurir ini." });
       if (order[0].isPreOrder && order[0].preOrderStatus !== "siap") throw new TRPCError({ code: "CONFLICT", message: "Pre-Order belum siap dari penjual." });
       if (order[0].status !== "Menunggu") throw new TRPCError({ code: "CONFLICT", message: "Tugas ini sudah diterima atau sudah diproses." });
-      await db.update(orders).set({ status: "Diproses", courierAcceptedAt: new Date() }).where(eq(orders.id, order[0].id));
+      const respondedAt = new Date();
+      await db.update(orders).set({ status: "Diproses", courierAcceptedAt: respondedAt, courierResponseStatus: "accepted", courierResponseDeadline: null }).where(eq(orders.id, order[0].id));
+      const attempt = await db.select({ id: orderCourierAttempts.id }).from(orderCourierAttempts).where(and(eq(orderCourierAttempts.orderId, order[0].id), eq(orderCourierAttempts.courierId, courier[0].id), eq(orderCourierAttempts.status, "assigned"))).orderBy(sql`${orderCourierAttempts.assignedAt} DESC`).limit(1);
+      if (attempt[0]) await db.update(orderCourierAttempts).set({ status: "accepted", respondedAt }).where(eq(orderCourierAttempts.id, attempt[0].id));
+      else await db.insert(orderCourierAttempts).values({ orderId: order[0].id, courierId: courier[0].id, status: "accepted", assignedAt: respondedAt, respondedAt });
       return { success: true as const, orderCode: input.orderCode, status: "Diproses" as const };
+    }),
+    rejectCourierTask: publicProcedure.input(z.object({ whatsapp: phone, orderCode: z.string().min(3), reason: z.enum(["penuh", "kendaraan", "jauh", "mendadak", "penjual", "lainnya"]), note: z.string().max(500).optional() })).mutation(async ({ input }) => {
+      const db = await dbRequired();
+      const courier = await db.select({ id: courierProfiles.id }).from(courierProfiles).where(and(eq(courierProfiles.whatsapp, normalizePhone(input.whatsapp)), eq(courierProfiles.verificationStatus, "verified"), eq(courierProfiles.isBanned, 0))).limit(1);
+      if (!courier[0]) throw new TRPCError({ code: "FORBIDDEN", message: "Kurir belum terverifikasi atau sedang diblokir." });
+      const order = await db.select({ id: orders.id, courierId: orders.courierId, status: orders.status, courierResponseStatus: orders.courierResponseStatus, whatsapp: orders.whatsapp }).from(orders).where(eq(orders.orderCode, input.orderCode)).limit(1);
+      if (!order[0] || order[0].courierId !== courier[0].id) throw new TRPCError({ code: "NOT_FOUND", message: "Tugas tidak ditemukan untuk kurir ini." });
+      if (order[0].status !== "Menunggu" || !["assigned", "not_assigned"].includes(order[0].courierResponseStatus)) throw new TRPCError({ code: "CONFLICT", message: "Tugas hanya dapat ditolak sebelum diterima." });
+      const respondedAt = new Date();
+      await db.transaction(async (tx: any) => {
+        await tx.update(orderCourierAttempts).set({ status: "rejected", reason: input.reason, note: input.note?.trim() || null, respondedAt }).where(and(eq(orderCourierAttempts.orderId, order[0].id), eq(orderCourierAttempts.courierId, courier[0].id), eq(orderCourierAttempts.status, "assigned")));
+        await tx.update(orders).set({ courierId: null, courierResponseStatus: "reassignment_required", courierResponseDeadline: null, courierReminderSentAt: null, updatedAt: respondedAt }).where(eq(orders.id, order[0].id));
+      });
+      void notifyBuyerCourierChange(order[0].whatsapp, input.orderCode, "rejected");
+      return { success: true as const, orderCode: input.orderCode, status: "reassignment_required" as const };
     }),
     cancelOrder: publicProcedure.input(z.object({ orderCode: z.string().min(3), whatsapp: phone })).mutation(async ({ input }) => {
       const db = await dbRequired();

@@ -53,6 +53,8 @@ export type MockOrder = {
   isPreOrder?: boolean;
   preOrderDays?: number;
   preOrderStatus?: string;
+  courierResponseStatus?: "not_assigned" | "assigned" | "accepted" | "rejected" | "no_response" | "reassignment_required";
+  courierResponseDeadline?: string | Date | null;
   time: string;
   courier?: string;
   courierCurrentLocation?: string | null;

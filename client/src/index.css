@@ -1395,3 +1395,11 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
     flex-wrap: wrap;
   }
 }
+
+.courier-task-response-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.reject-task-button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #efb5a5; background: #fff7f4; color: #b33d21; border-radius: 12px; padding: 10px 13px; font-weight: 700; cursor: pointer; }
+.reject-task-button:disabled { opacity: .55; cursor: not-allowed; }
+
+.courier-reassignment-alert { display: grid; gap: 3px; margin-top: 12px; padding: 11px 13px; border: 1px solid #f0c49f; border-radius: 12px; background: #fff8ed; color: #71401f; }
+.courier-reassignment-alert strong { color: #b5481e; }
+.courier-reassignment-alert small { color: #8b684f; }
