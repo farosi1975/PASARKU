@@ -5,7 +5,7 @@ import { Pool } from "pg";
 import { createPool as createMySqlPool } from "mysql2/promise";
 import { ENV } from "./_core/env";
 import type { InsertUser } from "../drizzle/schema";
-import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, pushSubscriptions, promoNotificationLogs, promoNotificationDeliveries, taxCashEntries, databaseDialect } from "./db-tables";
+import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderCourierAttempts, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, pushSubscriptions, promoNotificationLogs, promoNotificationDeliveries, taxCashEntries, databaseDialect } from "./db-tables";
 
 let _pool: Pool | null = null;
 let _mysqlPool: ReturnType<typeof createMySqlPool> | null = null;
@@ -455,6 +455,29 @@ export async function listOrders() {
   const db = await getDb(); if (!db) return [];
   const rows = await db.select().from(orders).orderBy(desc(orders.createdAt));
   return Promise.all(rows.map(async (order) => ({ ...order, items: await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)) })));
+}
+
+export async function listCourierAssignmentHistory() {
+  const db = await getDb(); if (!db) return [];
+  return db.select({
+    id: orderCourierAttempts.id,
+    orderId: orderCourierAttempts.orderId,
+    orderCode: orders.orderCode,
+    customerName: orders.customerName,
+    courierId: orderCourierAttempts.courierId,
+    courierName: courierProfiles.name,
+    courierWhatsapp: courierProfiles.whatsapp,
+    status: orderCourierAttempts.status,
+    reason: orderCourierAttempts.reason,
+    note: orderCourierAttempts.note,
+    assignedAt: orderCourierAttempts.assignedAt,
+    reminderSentAt: orderCourierAttempts.reminderSentAt,
+    respondedAt: orderCourierAttempts.respondedAt,
+  }).from(orderCourierAttempts)
+    .innerJoin(orders, eq(orderCourierAttempts.orderId, orders.id))
+    .leftJoin(courierProfiles, eq(orderCourierAttempts.courierId, courierProfiles.id))
+    .orderBy(desc(orderCourierAttempts.assignedAt))
+    .limit(100);
 }
 
 export type TaxCashEntryInput = {
