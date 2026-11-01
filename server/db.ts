@@ -5,7 +5,7 @@ import { Pool } from "pg";
 import { createPool as createMySqlPool } from "mysql2/promise";
 import { ENV } from "./_core/env";
 import type { InsertUser } from "../drizzle/schema";
-import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderCourierAttempts, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, pushSubscriptions, promoNotificationLogs, promoNotificationDeliveries, taxCashEntries, databaseDialect } from "./db-tables";
+import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderCourierAttempts, orderItems, orders, products, sellerProfiles, shippingSettings, siteSettings, supportTickets, userAccounts, users, visitorStats, pushSubscriptions, promoNotificationLogs, promoNotificationDeliveries, taxCashEntries, regionRegencies, regionDistricts, regionVillages, databaseDialect } from "./db-tables";
 
 let _pool: Pool | null = null;
 let _mysqlPool: ReturnType<typeof createMySqlPool> | null = null;
@@ -676,6 +676,71 @@ export async function deleteAdminAuditLogs(ids: number[], adminWhatsapp: string)
   if (!cleanIds.length) return { success: true as const, deleted: 0 };
   await db.delete(adminAuditLogs).where(inArray(adminAuditLogs.id, cleanIds));
   return { success: true as const, deleted: cleanIds.length };
+}
+
+export type RegionLevel = "regency" | "district" | "village";
+
+export async function listRegionMaster() {
+  const db = await getDb();
+  if (!db) return { regencies: [], districts: [], villages: [] };
+  const [regencies, districts, villages] = await Promise.all([
+    db.select().from(regionRegencies).orderBy(regionRegencies.name),
+    db.select().from(regionDistricts).orderBy(regionDistricts.name),
+    db.select().from(regionVillages).orderBy(regionVillages.name),
+  ]);
+  return { regencies, districts, villages };
+}
+
+export async function updateRegionMaster(input: { level: RegionLevel; code: string; name: string; capital?: string; type?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database belum tersedia.");
+  const name = input.name.trim();
+  if (input.level === "regency") {
+    const current = await db.select({ code: regionRegencies.code }).from(regionRegencies).where(eq(regionRegencies.code, input.code)).limit(1);
+    if (!current[0]) throw new Error("Kabupaten/kota tidak ditemukan.");
+    await db.update(regionRegencies).set({ name, capital: input.capital?.trim() || null, updatedAt: new Date() }).where(eq(regionRegencies.code, input.code));
+  } else if (input.level === "district") {
+    const current = await db.select({ code: regionDistricts.code }).from(regionDistricts).where(eq(regionDistricts.code, input.code)).limit(1);
+    if (!current[0]) throw new Error("Kecamatan tidak ditemukan.");
+    await db.update(regionDistricts).set({ name, updatedAt: new Date() }).where(eq(regionDistricts.code, input.code));
+  } else {
+    const current = await db.select({ code: regionVillages.code }).from(regionVillages).where(eq(regionVillages.code, input.code)).limit(1);
+    if (!current[0]) throw new Error("Desa/kelurahan tidak ditemukan.");
+    await db.update(regionVillages).set({ name, type: input.type?.trim() || "Desa", updatedAt: new Date() }).where(eq(regionVillages.code, input.code));
+  }
+  return { success: true as const };
+}
+
+export async function setRegionOperational(level: RegionLevel, code: string, isOperational: boolean) {
+  const db = await getDb();
+  if (!db) throw new Error("Database belum tersedia.");
+  const value = isOperational ? 1 : 0;
+  if (level === "regency") {
+    const current = await db.select().from(regionRegencies).where(eq(regionRegencies.code, code)).limit(1);
+    if (!current[0]) throw new Error("Kabupaten/kota tidak ditemukan.");
+    if (!isOperational) {
+      const children = await db.select({ code: regionDistricts.code }).from(regionDistricts).where(and(eq(regionDistricts.regencyCode, code), eq(regionDistricts.isOperational, 1))).limit(1);
+      if (children[0]) throw new Error("Nonaktifkan kecamatan operasional terlebih dahulu.");
+    }
+    await db.update(regionRegencies).set({ isOperational: value, updatedAt: new Date() }).where(eq(regionRegencies.code, code));
+  } else if (level === "district") {
+    const current = await db.select().from(regionDistricts).where(eq(regionDistricts.code, code)).limit(1);
+    if (!current[0]) throw new Error("Kecamatan tidak ditemukan.");
+    const parent = await db.select({ isOperational: regionRegencies.isOperational }).from(regionRegencies).where(eq(regionRegencies.code, current[0].regencyCode)).limit(1);
+    if (isOperational && !parent[0]?.isOperational) throw new Error("Aktifkan kabupaten/kota induk terlebih dahulu.");
+    if (!isOperational) {
+      const children = await db.select({ code: regionVillages.code }).from(regionVillages).where(and(eq(regionVillages.districtCode, code), eq(regionVillages.isOperational, 1))).limit(1);
+      if (children[0]) throw new Error("Nonaktifkan desa/kelurahan operasional terlebih dahulu.");
+    }
+    await db.update(regionDistricts).set({ isOperational: value, updatedAt: new Date() }).where(eq(regionDistricts.code, code));
+  } else {
+    const current = await db.select().from(regionVillages).where(eq(regionVillages.code, code)).limit(1);
+    if (!current[0]) throw new Error("Desa/kelurahan tidak ditemukan.");
+    const parent = await db.select({ isOperational: regionDistricts.isOperational }).from(regionDistricts).where(eq(regionDistricts.code, current[0].districtCode)).limit(1);
+    if (isOperational && !parent[0]?.isOperational) throw new Error("Aktifkan kecamatan induk terlebih dahulu.");
+    await db.update(regionVillages).set({ isOperational: value, updatedAt: new Date() }).where(eq(regionVillages.code, code));
+  }
+  return { success: true as const, isOperational };
 }
 
 export async function resetMarketplaceData() {

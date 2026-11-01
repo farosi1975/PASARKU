@@ -210,6 +210,34 @@ export const adminAuditLogs = pgTable("admin_audit_logs", {
   details: text("details"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
+
+export const regionRegencies = pgTable("region_regencies", {
+  code: varchar("code", { length: 8 }).primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  capital: varchar("capital", { length: 120 }),
+  isOperational: integer("isOperational").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export const regionDistricts = pgTable("region_districts", {
+  code: varchar("code", { length: 12 }).primaryKey(),
+  regencyCode: varchar("regencyCode", { length: 8 }).notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  isOperational: integer("isOperational").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export const regionVillages = pgTable("region_villages", {
+  code: varchar("code", { length: 16 }).primaryKey(),
+  districtCode: varchar("districtCode", { length: 12 }).notNull(),
+  name: varchar("name", { length: 160 }).notNull(),
+  type: varchar("type", { length: 24 }).default("Desa").notNull(),
+  isOperational: integer("isOperational").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   sellerId: integer("sellerId"),

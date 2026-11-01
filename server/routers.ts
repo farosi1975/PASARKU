@@ -4,8 +4,8 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { createSupportTicket, findBuyerByReferralCode, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listCourierAssignmentHistory, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminAuditLogs, deleteAdminProfile, deleteOrder, deleteSupportTicket, saveShippingSettings, updateSellerHandlingFee, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole, savePushSubscription, removePushSubscription, isPermanentAdminWhatsapp, listTaxCashEntries, syncCompletedOrderTaxEntries, createTaxCashEntry, updateTaxCashEntry, deleteTaxCashEntry } from "./db";
-import { adminProfiles, buyerProfiles, courierProfiles, orderCourierAttempts, orderItems, orders, products, sellerProfiles } from "./db-tables";
+import { createSupportTicket, findBuyerByReferralCode, getAccountRoles, getAdminProfile, getAdminUserDirectory, getBuyerProfile, getDashboardStats, getDb, getOrderWithItems, listBuyerOrders, getPublicStoreDetail, getSiteSettings, listAdminProfiles, updateAdminProfile, listApprovedProducts, listOpenStores, listCourierOrders, listCouriers, listOrders, listCourierAssignmentHistory, listSellerCouriers, listSellerOrders, listSellerProducts, listSupportTickets, recordVisitorVisit, resetMarketplaceData, deleteMarketplaceUser, listAdminAuditLogs, deleteAdminAuditLogs, deleteAdminProfile, deleteOrder, deleteSupportTicket, saveShippingSettings, updateSellerHandlingFee, saveSiteSettings, getShippingSettings, updateSupportTicketStatus, upsertAccountRole, savePushSubscription, removePushSubscription, isPermanentAdminWhatsapp, listTaxCashEntries, syncCompletedOrderTaxEntries, createTaxCashEntry, updateTaxCashEntry, deleteTaxCashEntry, listRegionMaster, updateRegionMaster, setRegionOperational } from "./db";
+import { adminAuditLogs, adminProfiles, buyerProfiles, courierProfiles, orderCourierAttempts, orderItems, orders, products, sellerProfiles } from "./db-tables";
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { sendFonnteMessage } from "./fonnte";
@@ -357,6 +357,26 @@ export const appRouter = router({
     }),
     adminLogout: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).mutation(({ input }) => { adminSessions.delete(input.sessionToken); return { success: true } as const; }),
     adminList: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listAdminProfiles(); }),
+    regionMaster: publicProcedure.input(z.object({ sessionToken: adminSessionToken })).query(async ({ input }) => { await requireAdminSession(input.sessionToken); return listRegionMaster(); }),
+    activeRegions: publicProcedure.query(async () => { const master = await listRegionMaster(); return { regencies: master.regencies.filter((item) => item.isOperational === 1), districts: master.districts.filter((item) => item.isOperational === 1), villages: master.villages.filter((item) => item.isOperational === 1) }; }),
+    updateRegionMaster: publicProcedure.input(z.object({ sessionToken: adminSessionToken, level: z.enum(["regency", "district", "village"]), code: z.string().min(4).max(16), name: z.string().trim().min(2).max(160), capital: z.string().trim().max(120).optional(), type: z.string().trim().max(24).optional() })).mutation(async ({ input }) => {
+      const admin = await requireAdminSession(input.sessionToken);
+      try {
+        const result = await updateRegionMaster(input);
+        const db = await dbRequired();
+        await db.insert(adminAuditLogs).values({ adminName: admin.name, adminWhatsapp: admin.whatsapp, action: "update_region", targetRole: input.level, targetId: 0, targetName: input.name.trim(), details: `Master wilayah ${input.level} dengan kode ${input.code} diperbarui.` });
+        return result;
+      } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Master wilayah belum dapat diperbarui." }); }
+    }),
+    setRegionOperational: publicProcedure.input(z.object({ sessionToken: adminSessionToken, level: z.enum(["regency", "district", "village"]), code: z.string().min(4).max(16), isOperational: z.boolean() })).mutation(async ({ input }) => {
+      const admin = await requireAdminSession(input.sessionToken);
+      try {
+        const result = await setRegionOperational(input.level, input.code, input.isOperational);
+        const db = await dbRequired();
+        await db.insert(adminAuditLogs).values({ adminName: admin.name, adminWhatsapp: admin.whatsapp, action: input.isOperational ? "activate_region" : "deactivate_region", targetRole: input.level, targetId: 0, targetName: input.code, details: `Status operasional master wilayah diubah menjadi ${input.isOperational ? "aktif" : "nonaktif"}.` });
+        return result;
+      } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Status wilayah belum dapat diubah." }); }
+    }),
     addAdmin: publicProcedure.input(z.object({ sessionToken: adminSessionToken, name: z.string().min(2), whatsapp: phone })).mutation(async ({ input }) => {
       await requireAdminSession(input.sessionToken);
       const db = await dbRequired();

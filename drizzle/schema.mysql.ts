@@ -202,6 +202,34 @@ export const adminAuditLogs = mysqlTable("admin_audit_logs", {
   details: text("details"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
+
+export const regionRegencies = mysqlTable("region_regencies", {
+  code: varchar("code", { length: 8 }).primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  capital: varchar("capital", { length: 120 }),
+  isOperational: int("isOperational").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export const regionDistricts = mysqlTable("region_districts", {
+  code: varchar("code", { length: 12 }).primaryKey(),
+  regencyCode: varchar("regencyCode", { length: 8 }).notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  isOperational: int("isOperational").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export const regionVillages = mysqlTable("region_villages", {
+  code: varchar("code", { length: 16 }).primaryKey(),
+  districtCode: varchar("districtCode", { length: 12 }).notNull(),
+  name: varchar("name", { length: 160 }).notNull(),
+  type: varchar("type", { length: 24 }).default("Desa").notNull(),
+  isOperational: int("isOperational").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
 export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   sellerId: int("sellerId"),

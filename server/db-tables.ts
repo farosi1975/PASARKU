@@ -30,6 +30,9 @@ export const {
   pushSubscriptions,
   promoNotificationLogs,
   promoNotificationDeliveries,
+  regionRegencies,
+  regionDistricts,
+  regionVillages,
 } = tables;
 
 export const databaseDialect = isMySql ? "mysql" : "postgres" as const;
