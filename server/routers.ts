@@ -259,15 +259,15 @@ export const appRouter = router({
     unsubscribeFromPush: publicProcedure.input(z.object({ endpoint: z.string().url().max(2048) })).mutation(({ input }) => removePushSubscription(input.endpoint)),
     storeDetail: publicProcedure.input(z.object({ sellerId: z.number().int().positive() })).query(({ input }) => getPublicStoreDetail(input.sellerId)),
     recordVisit: publicProcedure.mutation(() => recordVisitorVisit()),
-    registerBuyer: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().trim().min(2).max(160), village: z.string().trim().min(2).max(80), address: z.string().trim().min(2).max(500), referralCode: z.string().trim().min(4).max(24).optional() })).mutation(async ({ input }) => {
+    registerBuyer: publicProcedure.input(z.object({ whatsapp: phone, name: z.string().trim().min(2).max(160), village: z.string().trim().min(2).max(80), address: z.string().trim().min(2).max(500), regencyCode: z.string().trim().max(16).optional(), districtCode: z.string().trim().max(16).optional(), villageCode: z.string().trim().max(16).optional(), referralCode: z.string().trim().min(4).max(24).optional() })).mutation(async ({ input }) => {
       const whatsapp = normalizePhone(input.whatsapp);
       const existing = await getBuyerProfile(whatsapp);
       if (existing?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli ini diblokir oleh Admin PASARKU." });
       const referralCode = input.referralCode?.toUpperCase();
       if (referralCode && (!existing || !existing.referredByCode)) { const referrer = await findBuyerByReferralCode(referralCode); if (!referrer || referrer.whatsapp === whatsapp) throw new TRPCError({ code: "BAD_REQUEST", message: "Kode referral tidak ditemukan atau tidak dapat dipakai sendiri." }); }
       const db = await dbRequired();
-      const values = { name: input.name, whatsapp, village: input.village, address: input.address, referredByCode: referralCode || existing?.referredByCode || null, verificationStatus: "pending" as const, isBanned: 0 };
-      await db.insert(buyerProfiles).values(values).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: values.name, village: values.village, address: values.address, referredByCode: values.referredByCode, updatedAt: new Date() } });
+      const values = { name: input.name, whatsapp, village: input.village, address: input.address, regencyCode: input.regencyCode || existing?.regencyCode || null, districtCode: input.districtCode || existing?.districtCode || null, villageCode: input.villageCode || existing?.villageCode || null, referredByCode: referralCode || existing?.referredByCode || null, verificationStatus: "pending" as const, isBanned: 0 };
+      await db.insert(buyerProfiles).values(values).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: values.name, village: values.village, address: values.address, regencyCode: values.regencyCode, districtCode: values.districtCode, villageCode: values.villageCode, referredByCode: values.referredByCode, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.name);
       return { name: input.name, whatsapp, registrationToken: createBuyerRegistrationToken(whatsapp) };
     }),
@@ -564,10 +564,10 @@ export const appRouter = router({
     buyerProfile: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => getBuyerProfile(normalizePhone(input.whatsapp))),
     buyerOrders: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => listBuyerOrders(normalizePhone(input.whatsapp))),
     accountRoles: publicProcedure.input(z.object({ whatsapp: phone })).query(({ input }) => getAccountRoles(normalizePhone(input.whatsapp))),
-    saveBuyerProfile: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, village: z.string().min(2), address: z.string().optional(), avatarData: z.string().optional() })).mutation(async ({ input }) => {
+    saveBuyerProfile: publicProcedure.input(z.object({ name: z.string().min(2), whatsapp: phone, village: z.string().min(2), regencyCode: z.string().trim().max(16).optional(), districtCode: z.string().trim().max(16).optional(), villageCode: z.string().trim().max(16).optional(), address: z.string().optional(), avatarData: z.string().optional() })).mutation(async ({ input }) => {
       const db = await dbRequired(); const whatsapp = normalizePhone(input.whatsapp); const existing = await getBuyerProfile(whatsapp); if (existing?.isBanned) throw new TRPCError({ code: "FORBIDDEN", message: "Akun pembeli diblokir oleh Admin PASARKU." });
       const avatarUrl = input.avatarData ? await uploadAvatar(whatsapp, input.avatarData) : existing?.avatarUrl ?? null;
-      await db.insert(buyerProfiles).values({ name: input.name, whatsapp, village: input.village, address: input.address ?? null, avatarUrl }).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: input.name, village: input.village, address: input.address ?? null, avatarUrl, updatedAt: new Date() } });
+      await db.insert(buyerProfiles).values({ name: input.name, whatsapp, village: input.village, regencyCode: input.regencyCode || null, districtCode: input.districtCode || null, villageCode: input.villageCode || null, address: input.address ?? null, avatarUrl }).onConflictDoUpdate({ target: buyerProfiles.whatsapp, set: { name: input.name, village: input.village, regencyCode: input.regencyCode || null, districtCode: input.districtCode || null, villageCode: input.villageCode || null, address: input.address ?? null, avatarUrl, updatedAt: new Date() } });
       await upsertAccountRole(whatsapp, "buyer", input.name.trim());
       return getBuyerProfile(whatsapp);
     }),

@@ -1,0 +1,9 @@
+ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "regencyCode" varchar(16);
+ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "districtCode" varchar(16);
+ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "villageCode" varchar(16);
+ALTER TABLE "courier_profiles" ADD COLUMN IF NOT EXISTS "regencyCode" varchar(16);
+ALTER TABLE "courier_profiles" ADD COLUMN IF NOT EXISTS "districtCode" varchar(16);
+ALTER TABLE "courier_profiles" ADD COLUMN IF NOT EXISTS "villageCode" varchar(16);
+ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "regencyCode" varchar(16);
+ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "districtCode" varchar(16);
+ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "villageCode" varchar(16);

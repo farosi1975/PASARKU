@@ -69,6 +69,10 @@ const ensureMySqlRuntimeColumns = async () => {
     const code = (error as { code?: string }).code;
     if (code !== "ER_DUP_FIELDNAME") console.warn("[Database] Kolom biaya penanganan toko belum dapat disiapkan:", error instanceof Error ? error.message : error);
   }
+  for (const [table, column] of [["seller_profiles", "regencyCode"], ["seller_profiles", "districtCode"], ["seller_profiles", "villageCode"], ["courier_profiles", "regencyCode"], ["courier_profiles", "districtCode"], ["courier_profiles", "villageCode"], ["buyer_profiles", "regencyCode"], ["buyer_profiles", "districtCode"], ["buyer_profiles", "villageCode"]] as const) {
+    try { await _mysqlPool.query(`ALTER TABLE ${table} ADD COLUMN ${column} varchar(16) NULL`); }
+    catch (error) { const code = (error as { code?: string }).code; if (code !== "ER_DUP_FIELDNAME") console.warn(`[Database] Kolom wilayah ${table}.${column} belum dapat disiapkan:`, error instanceof Error ? error.message : error); }
+  }
   try { await _mysqlPool.query(`ALTER TABLE courier_profiles ADD COLUMN district varchar(80) NOT NULL DEFAULT 'Sawahan'`); }
   catch (error) {
     const code = (error as { code?: string }).code;
@@ -112,6 +116,15 @@ export async function getDb(): Promise<CompatibleDatabase | null> {
         await _pool.query(`ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "district" varchar(80) NOT NULL DEFAULT 'Sawahan'`);
         await _pool.query(`ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "handlingFeePercent" integer`);
         await _pool.query(`ALTER TABLE "courier_profiles" ADD COLUMN IF NOT EXISTS "district" varchar(80) NOT NULL DEFAULT 'Sawahan'`);
+        await _pool.query(`ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "regencyCode" varchar(16)`);
+        await _pool.query(`ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "districtCode" varchar(16)`);
+        await _pool.query(`ALTER TABLE "seller_profiles" ADD COLUMN IF NOT EXISTS "villageCode" varchar(16)`);
+        await _pool.query(`ALTER TABLE "courier_profiles" ADD COLUMN IF NOT EXISTS "regencyCode" varchar(16)`);
+        await _pool.query(`ALTER TABLE "courier_profiles" ADD COLUMN IF NOT EXISTS "districtCode" varchar(16)`);
+        await _pool.query(`ALTER TABLE "courier_profiles" ADD COLUMN IF NOT EXISTS "villageCode" varchar(16)`);
+        await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "regencyCode" varchar(16)`);
+        await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "districtCode" varchar(16)`);
+        await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "villageCode" varchar(16)`);
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referralCode" varchar(24)`);
         await _pool.query(`ALTER TABLE "buyer_profiles" ADD COLUMN IF NOT EXISTS "referredByCode" varchar(24)`);
         await _pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "buyer_profiles_referralCode_idx" ON "buyer_profiles" ("referralCode")`);

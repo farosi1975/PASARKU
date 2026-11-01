@@ -301,6 +301,8 @@ function CheckoutModal({ open, onClose, onDone, mode }: { open: boolean; onClose
 
 export default function Home() {
   const [, navigate] = useLocation();
+  const [buyerPhone, setBuyerPhone] = useState("");
+  const autoRegionApplied = useRef(false);
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   const [activeVillage, setActiveVillage] = useState("Semua desa");
@@ -312,9 +314,31 @@ export default function Home() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutMode, setCheckoutMode] = useState<"regular" | "preorder" | "all">("all");
   const { addItem } = useCart();
+  const activeRegions = trpc.marketplace.activeRegions.useQuery(undefined, { staleTime: 300000 });
+  const buyerProfile = trpc.marketplace.buyerProfile.useQuery({ whatsapp: buyerPhone || "0000000000" }, { enabled: buyerPhone.length >= 10 });
   const syncedProducts = trpc.marketplace.products.useQuery(undefined, { refetchInterval: 15000 });
   const openStores = trpc.marketplace.openStores.useQuery(undefined, { refetchInterval: 15000 });
   const siteSettings = trpc.marketplace.siteSettings.useQuery(undefined, { refetchInterval: 30000 });
+  useEffect(() => {
+    const loadSession = () => {
+      try { const session = JSON.parse(window.localStorage.getItem(USER_SESSION_KEY) || "null") as { phone?: string } | null; setBuyerPhone(session?.phone || ""); }
+      catch { setBuyerPhone(""); }
+    };
+    loadSession();
+    window.addEventListener(AUTH_EVENT, loadSession);
+    return () => window.removeEventListener(AUTH_EVENT, loadSession);
+  }, []);
+  useEffect(() => {
+    if (autoRegionApplied.current || !buyerProfile.data || !activeRegions.data) return;
+    const profile = buyerProfile.data;
+    const village = activeRegions.data.villages.find((item) => item.code === profile.villageCode || item.name.toLocaleLowerCase("id-ID") === (profile.village || "").toLocaleLowerCase("id-ID"));
+    const district = activeRegions.data.districts.find((item) => item.code === profile.districtCode || item.code === village?.districtCode);
+    const regency = activeRegions.data.regencies.find((item) => item.code === profile.regencyCode || item.code === district?.regencyCode);
+    if (regency) setActiveRegency(regency.name);
+    if (district) setActiveDistrict(district.name);
+    if (village) setActiveVillage(village.name);
+    autoRegionApplied.current = true;
+  }, [activeRegions.data, buyerProfile.data]);
   const catalogProducts = useMemo(() => (syncedProducts.data || []).map((item) => ({ id: String(item.id), sellerId: item.sellerId ?? undefined, name: item.name, vendor: item.vendor, category: item.category, price: item.price, unit: "", accent: "sunset", emoji: "🛍️", imageUrl: item.imageUrl, stock: item.stock, isPreOrder: Boolean(item.isPreOrder), preOrderDays: item.preOrderDays || 0, preOrderActive: Boolean(item.preOrderActive), sellerFreeShipping: item.sellerFreeShipping, storeLocation: item.sellerLocation, storeVillage: item.sellerVillage, storeDistrict: item.sellerDistrict || PASARKU_DISTRICT, storeRegency: PASARKU_REGENCY, openingTime: item.openingTime, closingTime: item.closingTime, description: `${item.name} dari ${item.vendor}.`, location: item.location, eta: "30–45 menit", badge: "Mitra lokal", storeOpen: true } satisfies Product)), [syncedProducts.data]);
   const villages = useMemo(() => {
     const catalogVillages = catalogProducts.map((product) => product.storeVillage || product.location.split(" · ")[0]);
