@@ -1411,3 +1411,30 @@ kbd { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; color
 .admin-courier-history-row small, .admin-courier-history-row span, .admin-courier-history-row time { color: #76675f; font-size: .8rem; }
 .admin-courier-history-row time { white-space: nowrap; }
 @media (max-width: 640px) { .admin-courier-history-row { display: grid; gap: 6px; } .admin-courier-history-row time { white-space: normal; } }
+
+.region-loading-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 8px;
+  color: var(--orange-dark);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.region-loading-note svg {
+  animation: region-loading-spin .8s linear infinite;
+}
+
+select:disabled {
+  cursor: wait;
+  opacity: .68;
+}
+
+@keyframes region-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .region-loading-note svg { animation: none; }
+}
