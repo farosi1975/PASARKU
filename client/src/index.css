@@ -1438,3 +1438,11 @@ select:disabled {
 @media (prefers-reduced-motion: reduce) {
   .region-loading-note svg { animation: none; }
 }
+
+
+.region-profile-button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 13px; border: 1px solid #f3b08f; border-radius: 999px; color: #a84b25; background: #fff4ed; font: inherit; font-size: 11px; font-weight: 750; white-space: nowrap; cursor: pointer; transition: background .18s ease, color .18s ease, transform .18s ease; }
+.region-profile-button:hover { color: #fff; background: var(--orange); }
+.region-profile-button:active { transform: scale(.97); }
+.catalog-region-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px 13px; border: 1px solid #f3d4bf; border-radius: 14px; color: #8d5137; background: #fff9f5; font-size: 12px; line-height: 1.45; }
+.catalog-region-note svg { flex: 0 0 auto; margin-top: 1px; color: var(--orange); }
+@media (max-width: 640px) { .region-profile-button, .filter-reset-button { min-height: 42px; } .catalog-region-note { font-size: 11px; } }
