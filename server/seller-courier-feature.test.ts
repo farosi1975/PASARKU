@@ -66,5 +66,7 @@ describe("seller and courier dashboard features", () => {
     expect(homePage).toContain('setActiveDistrict(buyerRegionSelection.district || "Semua kecamatan")');
     expect(homePage).toContain('setActiveVillage("Semua desa")');
     expect(homePage).toContain("Gunakan kecamatan saya");
+    expect(homePage).toContain("catalog-region-scope");
+    expect(homePage).toContain("Menampilkan toko se-Kecamatan");
   });
 });

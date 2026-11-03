@@ -1446,3 +1446,7 @@ select:disabled {
 .catalog-region-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px 13px; border: 1px solid #f3d4bf; border-radius: 14px; color: #8d5137; background: #fff9f5; font-size: 12px; line-height: 1.45; }
 .catalog-region-note svg { flex: 0 0 auto; margin-top: 1px; color: var(--orange); }
 @media (max-width: 640px) { .region-profile-button, .filter-reset-button { min-height: 42px; } .catalog-region-note { font-size: 11px; } }
+
+.catalog-region-scope { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; color: #a84b25; font-size: 12px; font-weight: 700; }
+.catalog-region-scope svg { color: var(--orange); }
+@media (max-width: 640px) { .catalog-region-scope { font-size: 11px; } }
