@@ -59,4 +59,12 @@ describe("seller and courier dashboard features", () => {
     expect(courierPage).toContain("pickupDistrict");
     expect(adminPage).toContain('order.status !== "Selesai"');
   });
+
+  it("keeps automatic buyer catalog filtering at district level", () => {
+    const homePage = readFileSync(new URL("../client/src/pages/Home.tsx", import.meta.url), "utf8");
+    expect(homePage).toContain("appliedRegionForPhone");
+    expect(homePage).toContain('setActiveDistrict(buyerRegionSelection.district || "Semua kecamatan")');
+    expect(homePage).toContain('setActiveVillage("Semua desa")');
+    expect(homePage).toContain("Gunakan kecamatan saya");
+  });
 });
