@@ -352,15 +352,16 @@ export default function Home() {
     return ["Semua desa", ...Array.from(new Set([...baseVillages, ...catalogVillages])).filter(Boolean).sort((a, b) => a.localeCompare(b, "id-ID"))];
   }, [activeDistrict, catalogProducts]);
   const normalizeFilterValue = (value: string | null | undefined) => (value || "").trim().toLocaleLowerCase("id-ID");
+  const normalizeRegionName = (value: string | null | undefined) => normalizeFilterValue(value).replace(/^(kabupaten|kota)\s+/, "");
   const visibleProducts = useMemo(() => {
-    const productsInRegion = catalogProducts.filter((product) => (selectedStoreId === null || product.sellerId === selectedStoreId) && (normalizeFilterValue(activeCategory) === normalizeFilterValue("Semua") || normalizeFilterValue(product.category) === normalizeFilterValue(activeCategory)) && (normalizeFilterValue(activeDistrict) === normalizeFilterValue("Semua kecamatan") || normalizeFilterValue(product.storeDistrict) === normalizeFilterValue(activeDistrict)) && (normalizeFilterValue(activeRegency) === normalizeFilterValue("Semua kabupaten") || normalizeFilterValue(product.storeRegency) === normalizeFilterValue(activeRegency)) && `${product.name} ${product.vendor}`.toLocaleLowerCase("id-ID").includes(search.trim().toLocaleLowerCase("id-ID")));
+    const productsInRegion = catalogProducts.filter((product) => (selectedStoreId === null || product.sellerId === selectedStoreId) && (normalizeFilterValue(activeCategory) === normalizeFilterValue("Semua") || normalizeFilterValue(product.category) === normalizeFilterValue(activeCategory)) && (normalizeFilterValue(activeDistrict) === normalizeFilterValue("Semua kecamatan") || normalizeFilterValue(product.storeDistrict) === normalizeFilterValue(activeDistrict)) && (normalizeRegionName(activeRegency) === normalizeRegionName("Semua kabupaten") || normalizeRegionName(product.storeRegency) === normalizeRegionName(activeRegency)) && `${product.name} ${product.vendor}`.toLocaleLowerCase("id-ID").includes(search.trim().toLocaleLowerCase("id-ID")));
     if (normalizeFilterValue(activeVillage) === normalizeFilterValue("Semua desa")) return productsInRegion;
     const productsInVillage = productsInRegion.filter((product) => normalizeFilterValue(product.storeVillage || product.location.split(" · ")[0]) === normalizeFilterValue(activeVillage));
     return productsInVillage.length ? productsInVillage : productsInRegion;
   }, [activeCategory, activeDistrict, activeRegency, activeVillage, catalogProducts, search, selectedStoreId]);
   const hasActiveFilter = activeCategory !== "Semua" || activeDistrict !== "Semua kecamatan" || activeRegency !== "Semua kabupaten" || activeVillage !== "Semua desa" || search.trim().length > 0;
   const visibleOpenStores = useMemo(() => {
-    const storesInRegion = (openStores.data || []).filter((store) => (activeRegency === "Semua kabupaten" || PASARKU_REGENCY === activeRegency) && (activeDistrict === "Semua kecamatan" || normalizeFilterValue(store.district || PASARKU_DISTRICT) === normalizeFilterValue(activeDistrict)));
+    const storesInRegion = (openStores.data || []).filter((store) => (normalizeRegionName(activeRegency) === normalizeRegionName("Semua kabupaten") || normalizeRegionName(PASARKU_REGENCY) === normalizeRegionName(activeRegency)) && (activeDistrict === "Semua kecamatan" || normalizeFilterValue(store.district || PASARKU_DISTRICT) === normalizeFilterValue(activeDistrict)));
     if (activeVillage === "Semua desa") return storesInRegion;
     const storesInVillage = storesInRegion.filter((store) => normalizeFilterValue(store.village) === normalizeFilterValue(activeVillage));
     return storesInVillage.length ? storesInVillage : storesInRegion;

@@ -68,5 +68,7 @@ describe("seller and courier dashboard features", () => {
     expect(homePage).toContain("Gunakan kecamatan saya");
     expect(homePage).toContain("catalog-region-scope");
     expect(homePage).toContain("Menampilkan toko se-Kecamatan");
+    expect(homePage).toContain("normalizeRegionName");
+    expect(homePage).toContain("normalizeRegionName(activeRegency)");
   });
 });
