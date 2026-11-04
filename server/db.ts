@@ -170,7 +170,7 @@ export async function listApprovedProducts() {
   const rows = await db.select({ product: products, seller: sellerProfiles }).from(products).innerJoin(sellerProfiles, eq(products.sellerId, sellerProfiles.id)).where(and(eq(products.status, "approved"), eq(sellerProfiles.verificationStatus, "verified"), eq(sellerProfiles.isBanned, 0), eq(sellerProfiles.isOpen, 1))).orderBy(desc(products.createdAt));
   const now = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
   const minutes = (value: string) => { const [hour, minute] = value.split(":").map(Number); return hour * 60 + minute; };
-  return rows.filter(({ seller }) => { const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime); return opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing; }).map(({ product, seller }) => ({ ...product, sellerFreeShipping: Boolean(seller.freeShipping), storeHandlingFeePercent: seller.handlingFeePercent, sellerLocation: seller.currentLocation, sellerVillage: seller.village, sellerDistrict: seller.district, openingTime: seller.openingTime, closingTime: seller.closingTime }));
+  return rows.filter(({ seller }) => { const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime); return opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing; }).map(({ product, seller }) => ({ ...product, sellerFreeShipping: Boolean(seller.freeShipping), storeHandlingFeePercent: seller.handlingFeePercent, sellerLocation: seller.currentLocation, sellerRegencyCode: seller.regencyCode, sellerVillage: seller.village, sellerDistrict: seller.district, openingTime: seller.openingTime, closingTime: seller.closingTime }));
 }
 
 export async function listOpenStores() {
@@ -181,7 +181,7 @@ export async function listOpenStores() {
   const openRows = rows.filter(({ seller }) => { const current = minutes(now); const opening = minutes(seller.openingTime); const closing = minutes(seller.closingTime); return opening <= closing ? current >= opening && current <= closing : current >= opening || current <= closing; });
   const stores = new Map<number, any>();
   for (const { product, seller } of openRows) {
-    const current = stores.get(seller.id) ?? { id: seller.id, shopName: seller.shopName, ownerName: seller.ownerName, whatsapp: seller.whatsapp, village: seller.village, district: seller.district, address: seller.address, avatarUrl: seller.avatarUrl, currentLocation: seller.currentLocation, openingTime: seller.openingTime, closingTime: seller.closingTime, freeShipping: Boolean(seller.freeShipping), productCount: 0, previewProducts: [] };
+    const current = stores.get(seller.id) ?? { id: seller.id, shopName: seller.shopName, ownerName: seller.ownerName, whatsapp: seller.whatsapp, regencyCode: seller.regencyCode, village: seller.village, district: seller.district, address: seller.address, avatarUrl: seller.avatarUrl, currentLocation: seller.currentLocation, openingTime: seller.openingTime, closingTime: seller.closingTime, freeShipping: Boolean(seller.freeShipping), productCount: 0, previewProducts: [] };
     current.productCount += 1;
     if (current.previewProducts.length < 3) current.previewProducts.push({ id: product.id, name: product.name, imageUrl: product.imageUrl, price: product.price });
     stores.set(seller.id, current);
