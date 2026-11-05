@@ -55,8 +55,16 @@ async function startServer() {
     const expected = process.env.PROMO_CRON_TOKEN?.trim();
     if (!expected || req.query.token !== expected) return res.status(401).json({ success: false, message: "Unauthorized" });
     try {
-      const [promo, courierAssignments] = await Promise.all([sendDuePromoNotifications(), processCourierAssignmentTimeouts()]);
-      return res.json({ success: true, ...promo, courierAssignments });
+      const [promoResult, courierResult] = await Promise.allSettled([sendDuePromoNotifications(), processCourierAssignmentTimeouts()]);
+      if (promoResult.status === "rejected") throw promoResult.reason;
+      let courierAssignments;
+      if (courierResult.status === "fulfilled") {
+        courierAssignments = courierResult.value;
+      } else {
+        console.error("[Scheduler] Pemrosesan timeout kurir dilewati:", courierResult.reason instanceof Error ? courierResult.reason.message : courierResult.reason);
+        courierAssignments = { checked: 0, remindersSent: 0, noResponseMarked: 0, buyerNotificationsSent: 0, notificationFailures: 0, skipped: "Schema scheduler kurir belum tersedia di database production." };
+      }
+      return res.json({ success: true, ...promoResult.value, courierAssignments });
     }
     catch (error) { return res.status(500).json({ success: false, message: error instanceof Error ? error.message : "Promo notification failed" }); }
   });
